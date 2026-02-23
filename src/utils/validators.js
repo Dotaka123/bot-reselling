@@ -24,10 +24,8 @@ function parseInput(text) {
   if (!text) return { type: 'text', value: '' };
   const trimmed = text.trim().toLowerCase();
 
-  // Commandes globales
+  // Commandes texte uniquement
   if (trimmed === 'annuler') return { type: 'command', value: 'ANNULER' };
-  if (trimmed === '9')       return { type: 'command', value: 'MAIN_MENU' };
-  if (trimmed === '0')       return { type: 'command', value: 'RETOUR' };
 
   // Nombre
   const num = parseInt(trimmed, 10);
