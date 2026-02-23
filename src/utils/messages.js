@@ -172,9 +172,9 @@ ${SEP}
     if (totalPages > 1) msg += `\n📄 Page ${page}/${totalPages}\n`;
     msg += '\n';
     parents.forEach((p, i) => {
-      const tech  = p.technology || '4G';
-      const usage = (p.usage !== undefined && p.usage >= 0) ? `${p.usage}%` : 'N/A';
-      msg += `${i + 1} - ${tech} | Usage: ${usage}\n`;
+      const tech = p.technology || '4G';
+      const port = p.http_port || p.socks_port || '—';
+      msg += `${i + 1} - ${tech} | Port: ${port}\n`;
     });
     msg += '\n';
     if (page < totalPages) msg += `9 - ➡️ Suite\n`;
