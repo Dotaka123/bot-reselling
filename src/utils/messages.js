@@ -25,7 +25,8 @@ const M = {
 Ce bot vous permet d'acheter des proxies mobiles 4G facilement.
 
 ${SEP}
-1 - 📝 Créer un compte`,
+1 - 📝 Créer un compte
+2 - 🔓 Se connecter`,
 
   WELCOME_BACK: (name) =>
 `👋 Bon retour ${name} !

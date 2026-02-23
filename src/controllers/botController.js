@@ -157,19 +157,21 @@ async function handleMessage(psid, messageText) {
 // ═══════════════════════════════════════════════════════════════
 
 async function handleWelcome(user, psid, input) {
-  if (user.isRegistered) {
-    // Utilisateur inscrit → captcha login
-    const captcha = generateCaptcha();
-    await userService.setState(user, 'CAPTCHA_LOGIN', { captcha });
-    await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
-    return;
-  }
+  // Option 1 : créer un compte
   if (input.type === 'number' && input.value === 1) {
     const captcha = generateCaptcha();
     await userService.setState(user, 'CAPTCHA_REGISTER', { captcha });
     await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
     return;
   }
+  // Option 2 : se connecter (avec ou sans compte existant sur ce PSID)
+  if (input.type === 'number' && input.value === 2) {
+    const captcha = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_LOGIN', { captcha });
+    await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
+    return;
+  }
+  // Utilisateur inscrit sur ce PSID → afficher quand même le menu d'accueil
   await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
 }
 
