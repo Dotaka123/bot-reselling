@@ -47,29 +47,45 @@ async function getMasterToken() {
   return masterToken;
 }
 
-async function call(method, endpoint, data = null, params = null) {
-  const token = await getMasterToken();
-  const cfg = {
-    method,
-    url:     `${API_BASE}${endpoint}`,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    timeout: 15000
-  };
-  if (data)   cfg.data   = data;
-  if (params) cfg.params = params;
+async function call(method, endpoint, data = null, params = null, retries = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const token = await getMasterToken();
+      const cfg = {
+        method,
+        url:     `${API_BASE}${endpoint}`,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        timeout: 20000
+      };
+      if (data)   cfg.data   = data;
+      if (params) cfg.params = params;
 
-  try {
-    return (await axios(cfg)).data;
-  } catch (err) {
-    if (err.response?.status === 401) {
-      masterToken = null;
-      const t2 = await getMasterToken();
-      cfg.headers.Authorization = `Bearer ${t2}`;
-      return (await axios(cfg)).data;
+      try {
+        return (await axios(cfg)).data;
+      } catch (err) {
+        if (err.response?.status === 401) {
+          masterToken = null;
+          const t2 = await getMasterToken();
+          cfg.headers.Authorization = `Bearer ${t2}`;
+          return (await axios(cfg)).data;
+        }
+        throw err;
+      }
+    } catch (err) {
+      lastErr = err;
+      const isRetryable = !err.response || err.response.status >= 500
+        || err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET';
+      if (isRetryable && attempt < retries) {
+        const delay = attempt * 1500;
+        console.warn(`⚠️  API ${endpoint} tentative ${attempt}/${retries} – retry dans ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      break;
     }
-    const msg = err.response?.data?.message || err.message;
-    throw new Error(msg);
   }
+  throw new Error(lastErr.response?.data?.message || lastErr.message);
 }
 
 // ── Méthodes publiques ────────────────────────────────────────────
