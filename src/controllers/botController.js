@@ -391,15 +391,8 @@ async function handleBuyParent(user, psid, input) {
   const parentProxy = list[idx];
   const { pkgId, proto, duration, durationLabel, price, country } = user.stateData;
 
-  // Balance du compte master API (juste informatif, l'API gère le rejet si insuffisant)
-  let balance = null;
-  try {
-    const bal = await proxyApiService.getBalance();
-    balance = bal.balance ?? null;
-  } catch (e) {
-    console.warn('⚠️ getBalance() échoue (ignoré):', e.message);
-    balance = null; // null = on ne sait pas, on laisse l'API décider
-  }
+  // Balance en cache (mise à jour à chaque login/achat, sans appel réseau)
+  const balance = proxyApiService.getCachedBalance();
 
   await userService.setState(user, 'BUY_CONFIRM', {
     ...user.stateData,
