@@ -367,18 +367,17 @@ Tapez 9 pour le menu`,
 ${SEP}
 
 🥇 GOLDEN (Mobile Premium)
-• 2 heures   → $0.35
-• 12 heures  → $0.80
-• 1 jour     → $1.50
-• 3 jours    → $3.50
-• 7 jours    → $7.00
-• 15 jours   → $13.00
-• 30 jours   → $24.00
+• 2 heures   → $0.30
+• 12 heures  → $0.60
+• 3 jours    → $2.50
+• 7 jours    → $4.50
+• 15 jours   → $10.00
+• 30 jours   → $18.00
 
 🥈 SILVER (Mobile Standard)
-• 2 jours    → $2.00
-• 7 jours    → $5.50
-• 30 jours   → $15.00
+• 2 jours    → $1.50
+• 7 jours    → $4.00
+• 30 jours   → $12.00
 
 ${SEP}
 0 - ↩ Retour | 9 - 🏠 Menu`,

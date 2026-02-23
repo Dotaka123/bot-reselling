@@ -12,18 +12,17 @@ let cachedBalance  = null; // balance récupérée au dernier login, mise à jou
 // Prix locaux configurables via env (miroir de /api/reseller/prices)
 const PROXY_PRICES = {
   1: [
-    { duration: 0.02, label: '2 heures',  price: parseFloat(process.env.PRICE_1_2H  || '0.35') },
-    { duration: 0.12, label: '12 heures', price: parseFloat(process.env.PRICE_1_12H || '0.80') },
-    { duration: 1,    label: '1 jour',    price: parseFloat(process.env.PRICE_1_1D  || '1.50') },
-    { duration: 3,    label: '3 jours',   price: parseFloat(process.env.PRICE_1_3D  || '3.50') },
-    { duration: 7,    label: '7 jours',   price: parseFloat(process.env.PRICE_1_7D  || '7.00') },
-    { duration: 15,   label: '15 jours',  price: parseFloat(process.env.PRICE_1_15D || '13.00') },
-    { duration: 30,   label: '30 jours',  price: parseFloat(process.env.PRICE_1_30D || '24.00') },
+    { duration: 0.02, label: '2 heures',  price: parseFloat(process.env.PRICE_1_2H  || '0.30') },
+    { duration: 0.12, label: '12 heures', price: parseFloat(process.env.PRICE_1_12H || '0.60') },
+    { duration: 3,    label: '3 jours',   price: parseFloat(process.env.PRICE_1_3D  || '2.50') },
+    { duration: 7,    label: '7 jours',   price: parseFloat(process.env.PRICE_1_7D  || '4.50') },
+    { duration: 15,   label: '15 jours',  price: parseFloat(process.env.PRICE_1_15D || '10.00') },
+    { duration: 30,   label: '30 jours',  price: parseFloat(process.env.PRICE_1_30D || '18.00') },
   ],
   2: [
-    { duration: 2,  label: '2 jours',  price: parseFloat(process.env.PRICE_2_2D  || '2.00') },
-    { duration: 7,  label: '7 jours',  price: parseFloat(process.env.PRICE_2_7D  || '5.50') },
-    { duration: 30, label: '30 jours', price: parseFloat(process.env.PRICE_2_30D || '15.00') },
+    { duration: 2,  label: '2 jours',  price: parseFloat(process.env.PRICE_2_2D  || '1.50') },
+    { duration: 7,  label: '7 jours',  price: parseFloat(process.env.PRICE_2_7D  || '4.00') },
+    { duration: 30, label: '30 jours', price: parseFloat(process.env.PRICE_2_30D || '12.00') },
   ]
 };
 
