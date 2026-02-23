@@ -6,21 +6,20 @@ const webhookRouter = require('./routes/webhook');
 const { startExpiryCheck } = require('./cron/expiryCron');
 
 const app  = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 // ── Middlewares ───────────────────────────────────────────────────
 
-// Capture du rawBody pour la vérification de signature Facebook
-app.use((req, res, next) => {
-  let data = '';
-  req.on('data', chunk => data += chunk);
-  req.on('end', () => {
-    req.rawBody = data;
-    next();
-  });
-});
+// express.json() avec capture du rawBody via l'option verify
+// C'est la SEULE façon correcte — ne jamais lire le stream manuellement avant
+app.use(express.json({
+  verify: (req, res, buf) => {
+    // buf est un Buffer disponible AVANT le parsing JSON
+    // On le stocke pour la vérification de signature Facebook (X-Hub-Signature-256)
+    req.rawBody = buf;
+  }
+}));
 
-app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ────────────────────────────────────────────────────────
