@@ -11,7 +11,7 @@ const TopUpRequest      = require('../models/TopUpRequest');
  * ═══════════════════════════════════════════════════════════════
  *  STATE MACHINE
  *  WELCOME → (1) CAPTCHA_REGISTER → REGISTER_EMAIL → REGISTER_PASSWORD
- *          → (2) LOGIN_EMAIL → LOGIN_PASSWORD
+ *          → (2) CAPTCHA_LOGIN → LOGIN_EMAIL → LOGIN_PASSWORD
  *  MAIN_MENU
  *  BUY_PKG → BUY_PROTO → BUY_DURATION → BUY_COUNTRY →
  *    BUY_CITY → BUY_PROVIDER → BUY_PARENT → BUY_CONFIRM
@@ -21,13 +21,69 @@ const TopUpRequest      = require('../models/TopUpRequest');
  * ═══════════════════════════════════════════════════════════════
  */
 
-const PAGE = M.PAGE_SIZE; // items par page
+const PAGE = M.PAGE_SIZE;
 
 // ── Générateur de captcha ────────────────────────────────────────
 function generateCaptcha() {
   const a = Math.floor(Math.random() * 9) + 1;
   const b = Math.floor(Math.random() * 9) + 1;
   return { a, b, answer: a + b };
+}
+
+// ── Helpers pagination ───────────────────────────────────────────
+function getPage(allItems, page) {
+  const start = (page - 1) * PAGE;
+  return allItems.slice(start, start + PAGE);
+}
+function totalPages(allItems) {
+  return Math.max(1, Math.ceil(allItems.length / PAGE));
+}
+
+/**
+ * Helper paginé générique.
+ * Gère 0 (retour/page précédente) et 9 (page suivante) de façon fiable,
+ * AVANT tout calcul d'index. Retourne null si une action pagination a été
+ * effectuée, ou { idx, pageItems } si un item a été choisi.
+ */
+async function handlePaginatedInput({ user, psid, input, items, page, tp,
+  stateName, statePageKey, showFn, onBack }) {
+  const n = input.type === 'number' ? input.value : null;
+
+  // 0 → page précédente ou retour
+  if (n === 0) {
+    if (page > 1) {
+      const newPage = page - 1;
+      await userService.setState(user, stateName, { ...user.stateData, [statePageKey]: newPage });
+      await showFn(getPage(items, newPage), newPage, tp);
+    } else {
+      await onBack();
+    }
+    return null;
+  }
+
+  // 9 → page suivante (ou message si déjà dernière page)
+  if (n === 9) {
+    if (page < tp) {
+      const newPage = page + 1;
+      await userService.setState(user, stateName, { ...user.stateData, [statePageKey]: newPage });
+      await showFn(getPage(items, newPage), newPage, tp);
+    } else {
+      await sendText(psid, `⚠️ Vous êtes déjà sur la dernière page.\n(0 = retour)`);
+      await showFn(getPage(items, page), page, tp);
+    }
+    return null;
+  }
+
+  // Sélection d'item
+  const pageItems = getPage(items, page);
+  const idx = (n || 0) - 1;
+  if (input.type !== 'number' || idx < 0 || idx >= pageItems.length) {
+    await sendText(psid, M.INVALID_OPTION(pageItems.length));
+    await showFn(pageItems, page, tp);
+    return null;
+  }
+
+  return { idx, pageItems };
 }
 
 // ── Entrée principale ────────────────────────────────────────────
@@ -45,18 +101,16 @@ async function handleMessage(psid, messageText) {
 
   const input = parseInput(messageText);
 
-  // Commandes globales (hors inscription/login/captcha)
-  const FLOW_STATES = ['WELCOME', 'CAPTCHA_REGISTER', 'CAPTCHA_LOGIN', 'REGISTER_EMAIL', 'REGISTER_PASSWORD', 'LOGIN_EMAIL', 'LOGIN_PASSWORD'];
+  // Commandes globales (hors états de flux d'inscription/login/captcha)
+  const FLOW_STATES = ['WELCOME','CAPTCHA_REGISTER','CAPTCHA_LOGIN','REGISTER_EMAIL','REGISTER_PASSWORD','LOGIN_EMAIL','LOGIN_PASSWORD'];
   if (!FLOW_STATES.includes(user.state)) {
-    if (input.type === 'command') {
-      if (input.value === 'ANNULER') {
-        await userService.setState(user, 'MAIN_MENU');
-        await sendText(psid, M.CANCELLED);
-        await sendText(psid, M.MAIN_MENU);
-        return;
-      }
+    if (input.type === 'command' && input.value === 'ANNULER') {
+      await userService.setState(user, 'MAIN_MENU');
+      await sendText(psid, M.CANCELLED);
+      await sendText(psid, M.MAIN_MENU);
+      return;
     }
-    // "9" = menu principal depuis n'importe où (sauf dans le flow d'achat où 9 = page suivante)
+    // 9 = menu principal, SAUF dans les états BUY où 9 = page suivante
     const BUY_STATES = ['BUY_PKG','BUY_PROTO','BUY_DURATION','BUY_COUNTRY','BUY_CITY','BUY_PROVIDER','BUY_PARENT','BUY_CONFIRM'];
     if (input.type === 'number' && input.value === 9 && !BUY_STATES.includes(user.state)) {
       await userService.setState(user, 'MAIN_MENU');
@@ -71,9 +125,9 @@ async function handleMessage(psid, messageText) {
       case 'CAPTCHA_REGISTER':   return handleCaptchaRegister(user, psid, input);
       case 'CAPTCHA_LOGIN':      return handleCaptchaLogin(user, psid, input);
       case 'LOGIN_EMAIL':        return handleLoginEmail(user, psid, input);
-      case 'LOGIN_PASSWORD':     return handleLoginPassword(user, psid, input);
+      case 'LOGIN_PASSWORD':     return handleLoginPassword(user, psid, input, messageText);
       case 'REGISTER_EMAIL':     return handleRegisterEmail(user, psid, input);
-      case 'REGISTER_PASSWORD':  return handleRegisterPassword(user, psid, input);
+      case 'REGISTER_PASSWORD':  return handleRegisterPassword(user, psid, input, messageText);
       case 'MAIN_MENU':          return handleMainMenu(user, psid, input);
       case 'BUY_PKG':            return handleBuyPkg(user, psid, input);
       case 'BUY_PROTO':          return handleBuyProto(user, psid, input);
@@ -99,32 +153,18 @@ async function handleMessage(psid, messageText) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  HELPERS PAGINATION
-// ═══════════════════════════════════════════════════════════════
-
-function getPage(allItems, page) {
-  const start = (page - 1) * PAGE;
-  return allItems.slice(start, start + PAGE);
-}
-function totalPages(allItems) {
-  return Math.max(1, Math.ceil(allItems.length / PAGE));
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  WELCOME / LOGIN / REGISTER
+//  WELCOME / CAPTCHA / LOGIN / REGISTER
 // ═══════════════════════════════════════════════════════════════
 
 async function handleWelcome(user, psid, input) {
-  // Utilisateur déjà inscrit : proposer login
   if (user.isRegistered) {
+    // Utilisateur inscrit → captcha login
     const captcha = generateCaptcha();
     await userService.setState(user, 'CAPTCHA_LOGIN', { captcha });
     await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
     return;
   }
-  // Nouvel utilisateur
   if (input.type === 'number' && input.value === 1) {
-    // Inscription → captcha d'abord
     const captcha = generateCaptcha();
     await userService.setState(user, 'CAPTCHA_REGISTER', { captcha });
     await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
@@ -133,77 +173,68 @@ async function handleWelcome(user, psid, input) {
   await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
 }
 
-// ── Captcha avant inscription ────────────────────────────────────
 async function handleCaptchaRegister(user, psid, input) {
-  const { captcha } = user.stateData;
   if (input.type === 'command' && input.value === 'ANNULER') {
     await userService.setState(user, 'WELCOME');
     await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
     return;
   }
+  const { captcha } = user.stateData;
   if (input.type !== 'number' || input.value !== captcha.answer) {
-    // Nouveau captcha
-    const newCaptcha = generateCaptcha();
-    await userService.setState(user, 'CAPTCHA_REGISTER', { captcha: newCaptcha });
+    const nc = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_REGISTER', { captcha: nc });
     await sendText(psid, M.CAPTCHA_FAIL);
-    await sendText(psid, M.CAPTCHA(newCaptcha.a, newCaptcha.b));
+    await sendText(psid, M.CAPTCHA(nc.a, nc.b));
     return;
   }
-  // Captcha validé → inscription
   await userService.setState(user, 'REGISTER_EMAIL');
   await sendText(psid, '✅ Vérification réussie !');
   await sendText(psid, M.REGISTER_ASK_EMAIL);
 }
 
-// ── Captcha avant login ──────────────────────────────────────────
 async function handleCaptchaLogin(user, psid, input) {
-  const { captcha } = user.stateData;
   if (input.type === 'command' && input.value === 'ANNULER') {
     await userService.setState(user, 'WELCOME');
     await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
     return;
   }
+  const { captcha } = user.stateData;
   if (input.type !== 'number' || input.value !== captcha.answer) {
-    const newCaptcha = generateCaptcha();
-    await userService.setState(user, 'CAPTCHA_LOGIN', { captcha: newCaptcha });
+    const nc = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_LOGIN', { captcha: nc });
     await sendText(psid, M.CAPTCHA_FAIL);
-    await sendText(psid, M.CAPTCHA(newCaptcha.a, newCaptcha.b));
+    await sendText(psid, M.CAPTCHA(nc.a, nc.b));
     return;
   }
-  // Captcha validé → si un seul compte lié au PSID, login direct
-  // sinon demander email/mdp
   await userService.setState(user, 'LOGIN_EMAIL');
   await sendText(psid, '✅ Vérification réussie !');
   await sendText(psid, M.LOGIN_ASK_EMAIL);
 }
 
-// ── Login : email ────────────────────────────────────────────────
 async function handleLoginEmail(user, psid, input) {
   if (input.type === 'command' && input.value === 'ANNULER') {
     await userService.setState(user, 'WELCOME');
     await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
     return;
   }
-  const email = (input.value || '').trim().toLowerCase();
+  const email = (typeof input.value === 'string' ? input.value : '').trim().toLowerCase();
   if (!isValidEmail(email)) {
     await sendText(psid, M.REGISTER_EMAIL_INVALID);
+    await sendText(psid, M.LOGIN_ASK_EMAIL);
     return;
   }
   await userService.setState(user, 'LOGIN_PASSWORD', { loginEmail: email });
   await sendText(psid, M.LOGIN_ASK_PASSWORD);
 }
 
-// ── Login : mot de passe ─────────────────────────────────────────
-async function handleLoginPassword(user, psid, input) {
+async function handleLoginPassword(user, psid, input, rawMessage) {
   if (input.type === 'command' && input.value === 'ANNULER') {
     await userService.setState(user, 'WELCOME');
     await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
     return;
   }
-  const password = input.value || '';
+  const password = (rawMessage || '').trim();
   const { loginEmail } = user.stateData;
-
-  // Chercher l'utilisateur par email
   const User = require('../models/User');
   const target = await User.findOne({ email: loginEmail });
   if (!target || !(await target.verifyPassword(password))) {
@@ -211,28 +242,18 @@ async function handleLoginPassword(user, psid, input) {
     await sendText(psid, M.LOGIN_ASK_PASSWORD);
     return;
   }
-
-  // Succès : fusionner le compte si nécessaire
+  // Lier ce PSID au compte trouvé si différent
   if (target.psid !== user.psid) {
-    // Ce PSID se connecte à un compte existant : on transfère la session
-    target.isLoggedIn = true;
-    target.lastActivity = new Date();
-    // On réinitialise l'ancien user fantôme
-    user.state = 'WELCOME';
-    user.stateData = {};
+    // Réinitialiser l'ancien user fantôme
+    user.state = 'WELCOME'; user.stateData = {};
     await user.save();
-    // Utiliser le compte cible pour la session
-    target.psid = user.psid; // lier ce PSID au compte
-    target.state = 'MAIN_MENU';
-    target.stateData = {};
-    await target.save();
-  } else {
-    target.isLoggedIn = true;
-    target.state = 'MAIN_MENU';
-    target.stateData = {};
-    await target.save();
+    target.psid = psid;
   }
-
+  target.isLoggedIn = true;
+  target.state = 'MAIN_MENU';
+  target.stateData = {};
+  target.lastActivity = new Date();
+  await target.save();
   await sendText(psid, M.LOGIN_SUCCESS(loginEmail));
   await sendText(psid, M.MAIN_MENU);
 }
@@ -244,21 +265,21 @@ async function handleRegisterEmail(user, psid, input) {
     await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
     return;
   }
-  const email = (input.value || '').trim();
+  const email = (typeof input.value === 'string' ? input.value : '').trim();
   if (!isValidEmail(email)) { await sendText(psid, M.REGISTER_EMAIL_INVALID); return; }
   if (await userService.isEmailTaken(email)) { await sendText(psid, M.REGISTER_EMAIL_TAKEN); return; }
   await userService.setState(user, 'REGISTER_PASSWORD', { pendingEmail: email.toLowerCase() });
   await sendText(psid, M.REGISTER_ASK_PASSWORD);
 }
 
-async function handleRegisterPassword(user, psid, input) {
+async function handleRegisterPassword(user, psid, input, rawMessage) {
   if (input.type === 'command' && input.value === 'ANNULER') {
     await userService.setState(user, 'WELCOME');
     await sendText(psid, M.CANCELLED);
     await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
     return;
   }
-  const password = input.value || '';
+  const password = (rawMessage || '').trim();
   if (!isValidPassword(password)) { await sendText(psid, M.REGISTER_PASSWORD_WEAK); return; }
   user.email        = user.stateData?.pendingEmail;
   user.password     = password;
@@ -271,6 +292,10 @@ async function handleRegisterPassword(user, psid, input) {
   await sendText(psid, M.REGISTER_SUCCESS(user.email));
   await sendText(psid, M.MAIN_MENU);
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN MENU
+// ═══════════════════════════════════════════════════════════════
 
 async function handleMainMenu(user, psid, input) {
   if (input.type !== 'number') {
@@ -323,6 +348,12 @@ async function handleBuyPkg(user, psid, input) {
     await sendText(psid, M.MAIN_MENU);
     return;
   }
+  if (input.type === 'number' && input.value === 9) {
+    // Pas de pagination ici, 9 = menu (déjà dans BUY_STATES donc pas intercepté globalement)
+    await sendText(psid, M.INVALID_OPTION(2));
+    await sendText(psid, M.BUY_SELECT_PKG);
+    return;
+  }
   if (input.type !== 'number' || ![1, 2].includes(input.value)) {
     await sendText(psid, M.INVALID_OPTION(2));
     await sendText(psid, M.BUY_SELECT_PKG);
@@ -339,6 +370,11 @@ async function handleBuyProto(user, psid, input) {
   if (input.type === 'number' && input.value === 0) {
     await userService.setState(user, 'BUY_PKG');
     await sendText(psid, M.BUY_SELECT_PKG);
+    return;
+  }
+  if (input.type === 'number' && input.value === 9) {
+    await sendText(psid, M.INVALID_OPTION(2));
+    await sendText(psid, M.BUY_SELECT_PROTO);
     return;
   }
   if (input.type !== 'number' || ![1, 2].includes(input.value)) {
@@ -358,6 +394,11 @@ async function handleBuyDuration(user, psid, input) {
   if (input.type === 'number' && input.value === 0) {
     await userService.setState(user, 'BUY_PROTO', { pkgId, prices, proto });
     await sendText(psid, M.BUY_SELECT_PROTO);
+    return;
+  }
+  if (input.type === 'number' && input.value === 9) {
+    await sendText(psid, M.INVALID_OPTION(prices.length));
+    await sendText(psid, M.BUY_SELECT_DURATION(prices));
     return;
   }
   const idx = (input.value || 0) - 1;
@@ -385,42 +426,26 @@ async function handleBuyDuration(user, psid, input) {
   }
 }
 
-// ── 4. Pays ─────────────────────────────────────────────────────
+// ── 4. Pays (paginé) ────────────────────────────────────────────
 async function handleBuyCountry(user, psid, input) {
   const { pkgId, proto, duration, durationLabel, price, countries } = user.stateData;
-  let page = user.stateData.countryPage || 1;
+  const page = user.stateData.countryPage || 1;
   const tp = totalPages(countries);
 
-  // 0 = retour si page 1, sinon page précédente
-  if (input.type === 'number' && input.value === 0) {
-    if (page > 1) {
-      page--;
-      await userService.setState(user, 'BUY_COUNTRY', { ...user.stateData, countryPage: page });
-      await sendText(psid, M.BUY_SELECT_COUNTRY(getPage(countries, page), page, tp));
-    } else {
-      await userService.setState(user, 'BUY_DURATION', { pkgId, prices: proxyApiService.getPricesForPkg(pkgId), proto });
-      await sendText(psid, M.BUY_SELECT_DURATION(proxyApiService.getPricesForPkg(pkgId)));
+  const result = await handlePaginatedInput({
+    user, psid, input,
+    items: countries, page, tp,
+    stateName: 'BUY_COUNTRY', statePageKey: 'countryPage',
+    showFn: (items, p, t) => sendText(psid, M.BUY_SELECT_COUNTRY(items, p, t)),
+    onBack: async () => {
+      const prices = proxyApiService.getPricesForPkg(pkgId);
+      await userService.setState(user, 'BUY_DURATION', { pkgId, prices, proto });
+      await sendText(psid, M.BUY_SELECT_DURATION(prices));
     }
-    return;
-  }
+  });
+  if (!result) return;
 
-  // 9 = page suivante
-  if (input.type === 'number' && input.value === 9 && page < tp) {
-    page++;
-    await userService.setState(user, 'BUY_COUNTRY', { ...user.stateData, countryPage: page });
-    await sendText(psid, M.BUY_SELECT_COUNTRY(getPage(countries, page), page, tp));
-    return;
-  }
-
-  const pageItems = getPage(countries, page);
-  const idx = (input.value || 0) - 1;
-  if (input.type !== 'number' || idx < 0 || idx >= pageItems.length) {
-    await sendText(psid, M.INVALID_OPTION(pageItems.length));
-    await sendText(psid, M.BUY_SELECT_COUNTRY(pageItems, page, tp));
-    return;
-  }
-
-  const country = pageItems[idx];
+  const country = result.pageItems[result.idx];
   await sendText(psid, '⏳ Chargement des villes...');
   try {
     const cities = await proxyApiService.getCities(country.id, pkgId);
@@ -430,52 +455,36 @@ async function handleBuyCountry(user, psid, input) {
     await userService.setState(user, 'BUY_CITY', {
       pkgId, proto, duration, durationLabel, price, countries,
       country: country.country_name, countryId: country.id,
-      cities, cityPage
+      cities, cityPage, countryPage: page
     });
     await sendText(psid, M.BUY_SELECT_CITY(getPage(cities, cityPage), cityPage, ctp));
   } catch (e) {
     await sendText(psid, M.BUY_ERROR(e.message));
-    await sendText(psid, M.BUY_SELECT_COUNTRY(pageItems, page, tp));
+    await sendText(psid, M.BUY_SELECT_COUNTRY(getPage(countries, page), page, tp));
   }
 }
 
-// ── 5. Ville ────────────────────────────────────────────────────
+// ── 5. Ville (paginée) ──────────────────────────────────────────
 async function handleBuyCity(user, psid, input) {
-  const { pkgId, proto, duration, durationLabel, price, countries, country, countryId, cities } = user.stateData;
-  let page = user.stateData.cityPage || 1;
+  const { pkgId, proto, duration, durationLabel, price, countries, cities } = user.stateData;
+  const page = user.stateData.cityPage || 1;
   const tp = totalPages(cities);
+  const countryPage = user.stateData.countryPage || 1;
 
-  if (input.type === 'number' && input.value === 0) {
-    if (page > 1) {
-      page--;
-      await userService.setState(user, 'BUY_CITY', { ...user.stateData, cityPage: page });
-      await sendText(psid, M.BUY_SELECT_CITY(getPage(cities, page), page, tp));
-    } else {
-      // Retour vers pays
+  const result = await handlePaginatedInput({
+    user, psid, input,
+    items: cities, page, tp,
+    stateName: 'BUY_CITY', statePageKey: 'cityPage',
+    showFn: (items, p, t) => sendText(psid, M.BUY_SELECT_CITY(items, p, t)),
+    onBack: async () => {
       const ctp = totalPages(countries);
-      const cp  = user.stateData.countryPage || 1;
-      await userService.setState(user, 'BUY_COUNTRY', { pkgId, proto, duration, durationLabel, price, countries, countryPage: cp });
-      await sendText(psid, M.BUY_SELECT_COUNTRY(getPage(countries, cp), cp, ctp));
+      await userService.setState(user, 'BUY_COUNTRY', { pkgId, proto, duration, durationLabel, price, countries, countryPage });
+      await sendText(psid, M.BUY_SELECT_COUNTRY(getPage(countries, countryPage), countryPage, ctp));
     }
-    return;
-  }
+  });
+  if (!result) return;
 
-  if (input.type === 'number' && input.value === 9 && page < tp) {
-    page++;
-    await userService.setState(user, 'BUY_CITY', { ...user.stateData, cityPage: page });
-    await sendText(psid, M.BUY_SELECT_CITY(getPage(cities, page), page, tp));
-    return;
-  }
-
-  const pageItems = getPage(cities, page);
-  const idx = (input.value || 0) - 1;
-  if (input.type !== 'number' || idx < 0 || idx >= pageItems.length) {
-    await sendText(psid, M.INVALID_OPTION(pageItems.length));
-    await sendText(psid, M.BUY_SELECT_CITY(pageItems, page, tp));
-    return;
-  }
-
-  const city = pageItems[idx];
+  const city = result.pageItems[result.idx];
   await sendText(psid, '⏳ Chargement des opérateurs...');
   try {
     const providers = await proxyApiService.getServiceProviders(city.id, pkgId);
@@ -485,115 +494,83 @@ async function handleBuyCity(user, psid, input) {
     await userService.setState(user, 'BUY_PROVIDER', {
       ...user.stateData,
       city: city.city_name, cityId: city.id,
-      providers, providerPage: provPage
+      providers, providerPage: provPage, cityPage: page
     });
     await sendText(psid, M.BUY_SELECT_PROVIDER(getPage(providers, provPage), provPage, ptp));
   } catch (e) {
     await sendText(psid, M.BUY_ERROR(e.message));
-    await sendText(psid, M.BUY_SELECT_CITY(pageItems, page, tp));
+    await sendText(psid, M.BUY_SELECT_CITY(getPage(cities, page), page, tp));
   }
 }
 
-// ── 6. Opérateur ────────────────────────────────────────────────
+// ── 6. Opérateur (paginé) ───────────────────────────────────────
 async function handleBuyProvider(user, psid, input) {
   const { pkgId, cities, providers } = user.stateData;
-  let page = user.stateData.providerPage || 1;
+  const page = user.stateData.providerPage || 1;
   const tp = totalPages(providers);
+  const cityPage = user.stateData.cityPage || 1;
 
-  if (input.type === 'number' && input.value === 0) {
-    if (page > 1) {
-      page--;
-      await userService.setState(user, 'BUY_PROVIDER', { ...user.stateData, providerPage: page });
-      await sendText(psid, M.BUY_SELECT_PROVIDER(getPage(providers, page), page, tp));
-    } else {
-      // Retour vers ville
-      const cp  = user.stateData.cityPage || 1;
+  const result = await handlePaginatedInput({
+    user, psid, input,
+    items: providers, page, tp,
+    stateName: 'BUY_PROVIDER', statePageKey: 'providerPage',
+    showFn: (items, p, t) => sendText(psid, M.BUY_SELECT_PROVIDER(items, p, t)),
+    onBack: async () => {
       const ctp = totalPages(cities);
-      await userService.setState(user, 'BUY_CITY', { ...user.stateData, cityPage: cp });
-      await sendText(psid, M.BUY_SELECT_CITY(getPage(cities, cp), cp, ctp));
+      await userService.setState(user, 'BUY_CITY', { ...user.stateData, cityPage });
+      await sendText(psid, M.BUY_SELECT_CITY(getPage(cities, cityPage), cityPage, ctp));
     }
-    return;
-  }
+  });
+  if (!result) return;
 
-  if (input.type === 'number' && input.value === 9 && page < tp) {
-    page++;
-    await userService.setState(user, 'BUY_PROVIDER', { ...user.stateData, providerPage: page });
-    await sendText(psid, M.BUY_SELECT_PROVIDER(getPage(providers, page), page, tp));
-    return;
-  }
-
-  const pageItems = getPage(providers, page);
-  const idx = (input.value || 0) - 1;
-  if (input.type !== 'number' || idx < 0 || idx >= pageItems.length) {
-    await sendText(psid, M.INVALID_OPTION(pageItems.length));
-    await sendText(psid, M.BUY_SELECT_PROVIDER(pageItems, page, tp));
-    return;
-  }
-
-  const provider = pageItems[idx];
+  const provider = result.pageItems[result.idx];
   await sendText(psid, '⏳ Chargement des serveurs disponibles...');
   try {
     const parents = await proxyApiService.getParentProxies(pkgId, provider.id);
-    // getParentProxies filtre déjà is_available=true ET status=ACTIVE
     if (!parents || !parents.length) throw new Error(`Aucun serveur disponible chez ${provider.service_provider_name}. Choisissez un autre opérateur.`);
     const parentPage = 1;
     const ptp = totalPages(parents);
     await userService.setState(user, 'BUY_PARENT', {
       ...user.stateData,
       provider: provider.service_provider_name, providerId: provider.id,
-      parents, parentPage
+      parents, parentPage, providerPage: page
     });
     await sendText(psid, M.BUY_SELECT_PARENT(getPage(parents, parentPage), parentPage, ptp));
   } catch (e) {
     await sendText(psid, M.BUY_ERROR(e.message));
-    await sendText(psid, M.BUY_SELECT_PROVIDER(pageItems, page, tp));
+    await sendText(psid, M.BUY_SELECT_PROVIDER(getPage(providers, page), page, tp));
   }
 }
 
-// ── 7. Proxy parent ─────────────────────────────────────────────
+// ── 7. Proxy parent (paginé) ────────────────────────────────────
 async function handleBuyParent(user, psid, input) {
-  const { providers, parents } = user.stateData;
-  let page = user.stateData.parentPage || 1;
+  const { pkgId, providers, parents } = user.stateData;
+  const page = user.stateData.parentPage || 1;
   const tp = totalPages(parents);
+  const providerPage = user.stateData.providerPage || 1;
 
-  if (input.type === 'number' && input.value === 0) {
-    if (page > 1) {
-      page--;
-      await userService.setState(user, 'BUY_PARENT', { ...user.stateData, parentPage: page });
-      await sendText(psid, M.BUY_SELECT_PARENT(getPage(parents, page), page, tp));
-    } else {
-      // Retour vers opérateur
-      const pp  = user.stateData.providerPage || 1;
+  const result = await handlePaginatedInput({
+    user, psid, input,
+    items: parents, page, tp,
+    stateName: 'BUY_PARENT', statePageKey: 'parentPage',
+    showFn: (items, p, t) => sendText(psid, M.BUY_SELECT_PARENT(items, p, t)),
+    onBack: async () => {
       const ptp = totalPages(providers);
-      await userService.setState(user, 'BUY_PROVIDER', { ...user.stateData, providerPage: pp });
-      await sendText(psid, M.BUY_SELECT_PROVIDER(getPage(providers, pp), pp, ptp));
+      await userService.setState(user, 'BUY_PROVIDER', { ...user.stateData, providerPage });
+      await sendText(psid, M.BUY_SELECT_PROVIDER(getPage(providers, providerPage), providerPage, ptp));
     }
-    return;
-  }
+  });
+  if (!result) return;
 
-  if (input.type === 'number' && input.value === 9 && page < tp) {
-    page++;
-    await userService.setState(user, 'BUY_PARENT', { ...user.stateData, parentPage: page });
-    await sendText(psid, M.BUY_SELECT_PARENT(getPage(parents, page), page, tp));
-    return;
-  }
-
-  const pageItems = getPage(parents, page);
-  const idx = (input.value || 0) - 1;
-  if (input.type !== 'number' || idx < 0 || idx >= pageItems.length) {
-    await sendText(psid, M.INVALID_OPTION(pageItems.length));
-    await sendText(psid, M.BUY_SELECT_PARENT(pageItems, page, tp));
-    return;
-  }
-
-  const parentProxy = pageItems[idx];
-  const { pkgId, proto, duration, durationLabel, price, country, city, provider } = user.stateData;
+  const parentProxy = result.pageItems[result.idx];
+  const { proto, durationLabel, price, country, city, provider } = user.stateData;
   const balance = user.balance || 0;
 
   await userService.setState(user, 'BUY_CONFIRM', {
     ...user.stateData,
     parentProxyId: parentProxy.id,
-    balance
+    balance,
+    parentPage: page
   });
 
   await sendText(psid, M.BUY_CONFIRM({
@@ -606,11 +583,18 @@ async function handleBuyParent(user, psid, input) {
 async function handleBuyConfirm(user, psid, input) {
   const { parents, parentPage } = user.stateData;
 
+  // 0 = retour vers liste parents
   if (input.type === 'number' && input.value === 0) {
     const page = parentPage || 1;
     const tp   = totalPages(parents);
     await userService.setState(user, 'BUY_PARENT', user.stateData);
     await sendText(psid, M.BUY_SELECT_PARENT(getPage(parents, page), page, tp));
+    return;
+  }
+
+  // 9 n'a pas de sens ici
+  if (input.type === 'number' && input.value === 9) {
+    await sendText(psid, M.INVALID_OPTION(2));
     return;
   }
 
@@ -627,8 +611,6 @@ async function handleBuyConfirm(user, psid, input) {
   }
 
   const { pkgId, proto, duration, durationLabel, price, country, countryId, parentProxyId } = user.stateData;
-
-  // Vérification du solde utilisateur (wallet MongoDB)
   const balance = user.balance || 0;
   if (balance < price) {
     await sendText(psid, M.BUY_INSUFFICIENT_BALANCE(price, balance));
@@ -638,21 +620,16 @@ async function handleBuyConfirm(user, psid, input) {
   }
 
   await sendText(psid, M.BUY_LOADING);
-
   try {
     const proxy = await proxyService.purchaseProxy(user, {
       packageId: pkgId, protocol: proto, duration, durationLabel,
       price, parentProxyId, country, countryCode: countryId
     });
-
-    // Débite le wallet utilisateur
     user.balance = Math.max(0, (user.balance || 0) - price);
     await user.save();
-
     await sendText(psid, M.BUY_SUCCESS(proxy));
     await userService.setState(user, 'MAIN_MENU');
     await sendText(psid, M.MAIN_MENU);
-
   } catch (err) {
     const errMsg = err.message || 'Erreur inconnue';
     console.error('❌ Achat échoué:', errMsg, err.stack);
@@ -685,7 +662,7 @@ async function handleProfile(user, psid, input) {
       await showProfile(user, psid);
       return;
     }
-    let msg = `${'-'.repeat(18)}\n🔄 RENOUVELER UN PROXY\n${'-'.repeat(18)}\n\n`;
+    let msg = `${'─'.repeat(18)}\n🔄 RENOUVELER UN PROXY\n${'─'.repeat(18)}\n\n`;
     expired.slice(0, 8).forEach((p, i) => { msg += `${i + 1} - ${p.ip}:${p.port} (${p.country || '—'})\n`; });
     msg += `\n0 - ↩ Retour`;
     await userService.setState(user, 'PROFILE_RENEW', { expiredProxies: expired.map(p => p._id.toString()) });
@@ -697,7 +674,7 @@ async function handleProfile(user, psid, input) {
 }
 
 async function handleProfileRenew(user, psid, input) {
-  if ((input.type === 'command' && input.value === 'RETOUR') || (input.type === 'number' && input.value === 0)) {
+  if (input.type === 'number' && input.value === 0) {
     await userService.setState(user, 'PROFILE');
     await showProfile(user, psid);
     return;
@@ -724,22 +701,15 @@ async function handleTopUp(user, psid, input, rawMessage) {
     return;
   }
 
-  const amount = parseFloat(rawMessage?.trim());
+  const amount = parseFloat((rawMessage || '').trim());
   if (isNaN(amount) || amount <= 0) {
     await sendText(psid, M.TOPUP_INVALID);
     await sendText(psid, M.TOPUP_MENU(user.balance || 0));
     return;
   }
 
-  // Crée la demande en base
-  await TopUpRequest.create({
-    userId: user._id,
-    psid:   user.psid,
-    email:  user.email,
-    amount
-  });
+  await TopUpRequest.create({ userId: user._id, psid: user.psid, email: user.email, amount });
 
-  // Notifie l'admin
   const adminPsid = process.env.ADMIN_PSID;
   if (adminPsid && adminPsid !== psid) {
     try {
@@ -765,7 +735,12 @@ async function handleSupport(user, psid, input, rawMessage) {
     await sendText(psid, M.MAIN_MENU);
     return;
   }
-  const message = rawMessage?.trim();
+  if (input.type === 'number' && input.value === 0) {
+    await userService.setState(user, 'MAIN_MENU');
+    await sendText(psid, M.MAIN_MENU);
+    return;
+  }
+  const message = (rawMessage || '').trim();
   if (!message || message.length < 3) {
     await sendText(psid, '⚠️ Message trop court. Décrivez votre problème.');
     return;
