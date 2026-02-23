@@ -6,8 +6,6 @@ const proxyApi     = require('./proxyApiService');
  */
 async function getUserProxies(userId) {
   const proxies = await Proxy.find({ userId }).sort({ purchasedAt: -1 });
-
-  // Met à jour le statut dynamiquement
   const now = new Date();
   const toSave = [];
   for (const p of proxies) {
@@ -17,31 +15,31 @@ async function getUserProxies(userId) {
     }
   }
   if (toSave.length) await Promise.all(toSave);
-
   return proxies;
 }
 
 /**
  * Achète un proxy via l'API et le sauvegarde en base
+ * Gère la génération/vérification de credentials et les erreurs API
  */
 async function purchaseProxy(user, purchaseData) {
-  const {
-    packageId,
-    protocol,
-    duration,
-    durationLabel,
-    price,
-    parentProxyId,
-    country,
-    countryCode
-  } = purchaseData;
+  const { packageId, protocol, duration, durationLabel, price, parentProxyId, country, countryCode } = purchaseData;
 
-  // Génère des credentials uniques
-  const creds = proxyApi.generateCredentials(
-    `p${user.psid.slice(-4)}`
-  );
+  // Génère des credentials uniques et vérifie la dispo (max 5 tentatives)
+  let creds;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = proxyApi.generateCredentials(`u${user.psid.slice(-4)}`);
+    const available = await proxyApi.checkUsername(candidate.username);
+    if (available) { creds = candidate; break; }
+    console.warn(`Username ${candidate.username} déjà pris, nouvel essai...`);
+  }
+  if (!creds) {
+    creds = proxyApi.generateCredentials('px' + Date.now().toString(36).slice(-4));
+  }
 
-  // Appel API
+  console.log(`🔑 Credentials générés: ${creds.username} / ${creds.password}`);
+
+  // Appel API d'achat
   const apiResult = await proxyApi.buyProxy({
     parentProxyId,
     packageId,
@@ -51,12 +49,15 @@ async function purchaseProxy(user, purchaseData) {
     password: creds.password
   });
 
+  console.log('✅ Résultat achat API:', JSON.stringify(apiResult));
+
   // Calcul date d'expiration
-  let expiresAt = null;
+  let expiresAt;
   if (apiResult.expire_at) {
     expiresAt = new Date(apiResult.expire_at);
   } else {
-    expiresAt = new Date(Date.now() + duration * 24 * 3600 * 1000);
+    // Fallback : duration en jours (si < 1, c'est en fraction de jour = heures)
+    expiresAt = new Date(Date.now() + parseFloat(duration) * 24 * 3600 * 1000);
   }
 
   // Sauvegarde en base

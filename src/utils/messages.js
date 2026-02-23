@@ -131,8 +131,11 @@ ${SEP}
     return msg;
   },
 
-  BUY_CONFIRM: (data) =>
-`${SEP}
+  BUY_CONFIRM: (data) => {
+    const balLine = (data.balance !== null && data.balance !== undefined)
+      ? `\n💳 Solde    : $${(+data.balance).toFixed(2)}\n💳 Après    : $${(data.balance - data.price).toFixed(2)}`
+      : '';
+    return `${SEP}
 ✅ CONFIRMATION D'ACHAT
 ${SEP}
 
@@ -140,15 +143,14 @@ ${SEP}
 📡 Protocole: ${data.proto.toUpperCase()}
 ⏱  Durée    : ${data.duration}
 🌍 Pays     : ${data.country}
-💵 Prix     : $${data.price}
-💳 Solde    : $${data.balance}
-💳 Après    : $${(data.balance - data.price).toFixed(2)}
+💵 Prix     : $${data.price}${balLine}
 
 ${SEP}
 1 - ✅ Confirmer l'achat
 2 - ❌ Annuler
 
-0 - ↩ Retour`,
+0 - ↩ Retour`;
+  },
 
   BUY_INSUFFICIENT_BALANCE: (price, balance) =>
 `❌ Solde insuffisant.

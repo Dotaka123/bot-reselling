@@ -391,14 +391,15 @@ async function handleBuyParent(user, psid, input) {
   const parentProxy = list[idx];
   const { pkgId, proto, duration, durationLabel, price, country } = user.stateData;
 
-  // Balance utilisateur (simulée via API ou stockée localement)
-  // Dans ce bot, la balance est gérée par le backend proxyApi
-  // On affiche un solde fictif si pas disponible
-  let balance = 0;
+  // Balance du compte master API (juste informatif, l'API gère le rejet si insuffisant)
+  let balance = null;
   try {
     const bal = await proxyApiService.getBalance();
-    balance = bal.balance || 0;
-  } catch { balance = 0; }
+    balance = bal.balance ?? null;
+  } catch (e) {
+    console.warn('⚠️ getBalance() échoue (ignoré):', e.message);
+    balance = null; // null = on ne sait pas, on laisse l'API décider
+  }
 
   await userService.setState(user, 'BUY_CONFIRM', {
     ...user.stateData,
@@ -445,8 +446,9 @@ async function handleBuyConfirm(user, psid, input) {
   // ── Achat réel ────────────────────────────
   const { pkgId, proto, duration, durationLabel, price, country, countryId, parentProxyId, balance } = user.stateData;
 
-  // Vérif solde
-  if (balance < price) {
+  // Vérif solde seulement si on a pu récupérer la balance ET qu'elle est clairement insuffisante
+  // Si balance = null (échec API), on tente quand même l'achat — l'API rejettera si besoin
+  if (balance !== null && balance < price) {
     await sendText(psid, M.BUY_INSUFFICIENT_BALANCE(price, balance));
     await userService.setState(user, 'MAIN_MENU');
     await sendText(psid, M.MAIN_MENU);
@@ -472,8 +474,10 @@ async function handleBuyConfirm(user, psid, input) {
     await sendText(psid, M.MAIN_MENU);
 
   } catch (err) {
-    console.error('Achat échoué:', err.message);
-    await sendText(psid, M.BUY_ERROR(err.message));
+    const errMsg = err.message || 'Erreur inconnue';
+    console.error('❌ Achat échoué — message:', errMsg);
+    console.error('❌ Achat échoué — stack:', err.stack);
+    await sendText(psid, M.BUY_ERROR(errMsg));
     await userService.setState(user, 'MAIN_MENU');
     await sendText(psid, M.MAIN_MENU);
   }
