@@ -25,15 +25,55 @@ const M = {
 Ce bot vous permet d'acheter des proxies mobiles 4G facilement.
 
 ${SEP}
-Vous n'avez pas encore de compte.
+1 - 📝 Créer un compte`,
 
-Tapez 1 pour créer votre compte`,
+  WELCOME_BACK: (name) =>
+`👋 Bon retour ${name} !
 
-  WELCOME_BACK: (email) =>
-`👋 Bon retour, ${email} !
+${SEP}
+1 - 🔓 Se connecter
+2 - 📝 Créer un nouveau compte
+
+(Tapez \"annuler\" pour revenir)`,
+
+  // ── Login ──────────────────────────────────
+  LOGIN_ASK_EMAIL:
+`🔐 CONNEXION — Étape 1/2
+
+Entrez votre adresse email :
+
+(Tapez "annuler" pour annuler)`,
+
+  LOGIN_ASK_PASSWORD:
+`🔐 CONNEXION — Étape 2/2
+
+Entrez votre mot de passe :
+
+(Tapez "annuler" pour annuler)`,
+
+  LOGIN_WRONG:
+`❌ Email ou mot de passe incorrect.
+
+Réessayez ou tapez "annuler" pour revenir.`,
+
+  LOGIN_SUCCESS: (email) =>
+`✅ Connecté avec succès !
+
+📧 ${email}
 
 ${SEP}
 Tapez 9 pour le menu principal`,
+
+  // ── Captcha ────────────────────────────────
+  CAPTCHA: (a, b) =>
+`🤖 Vérification anti-robot
+
+Combien font ${a} + ${b} ?
+
+(Tapez le résultat)`,
+
+  CAPTCHA_FAIL:
+`❌ Mauvaise réponse. Réessayez.`,
 
   // ── Inscription ────────────────────────────
   REGISTER_ASK_EMAIL:

@@ -10,7 +10,8 @@ const TopUpRequest      = require('../models/TopUpRequest');
 /**
  * ═══════════════════════════════════════════════════════════════
  *  STATE MACHINE
- *  WELCOME → REGISTER_EMAIL → REGISTER_PASSWORD
+ *  WELCOME → (1) CAPTCHA_REGISTER → REGISTER_EMAIL → REGISTER_PASSWORD
+ *          → (2) LOGIN_EMAIL → LOGIN_PASSWORD
  *  MAIN_MENU
  *  BUY_PKG → BUY_PROTO → BUY_DURATION → BUY_COUNTRY →
  *    BUY_CITY → BUY_PROVIDER → BUY_PARENT → BUY_CONFIRM
@@ -21,6 +22,13 @@ const TopUpRequest      = require('../models/TopUpRequest');
  */
 
 const PAGE = M.PAGE_SIZE; // items par page
+
+// ── Générateur de captcha ────────────────────────────────────────
+function generateCaptcha() {
+  const a = Math.floor(Math.random() * 9) + 1;
+  const b = Math.floor(Math.random() * 9) + 1;
+  return { a, b, answer: a + b };
+}
 
 // ── Entrée principale ────────────────────────────────────────────
 async function handleMessage(psid, messageText) {
@@ -37,8 +45,9 @@ async function handleMessage(psid, messageText) {
 
   const input = parseInput(messageText);
 
-  // Commandes globales (hors inscription)
-  if (!['WELCOME', 'REGISTER_EMAIL', 'REGISTER_PASSWORD'].includes(user.state)) {
+  // Commandes globales (hors inscription/login/captcha)
+  const FLOW_STATES = ['WELCOME', 'CAPTCHA_REGISTER', 'CAPTCHA_LOGIN', 'REGISTER_EMAIL', 'REGISTER_PASSWORD', 'LOGIN_EMAIL', 'LOGIN_PASSWORD'];
+  if (!FLOW_STATES.includes(user.state)) {
     if (input.type === 'command') {
       if (input.value === 'ANNULER') {
         await userService.setState(user, 'MAIN_MENU');
@@ -59,6 +68,10 @@ async function handleMessage(psid, messageText) {
   try {
     switch (user.state) {
       case 'WELCOME':            return handleWelcome(user, psid, input);
+      case 'CAPTCHA_REGISTER':   return handleCaptchaRegister(user, psid, input);
+      case 'CAPTCHA_LOGIN':      return handleCaptchaLogin(user, psid, input);
+      case 'LOGIN_EMAIL':        return handleLoginEmail(user, psid, input);
+      case 'LOGIN_PASSWORD':     return handleLoginPassword(user, psid, input);
       case 'REGISTER_EMAIL':     return handleRegisterEmail(user, psid, input);
       case 'REGISTER_PASSWORD':  return handleRegisterPassword(user, psid, input);
       case 'MAIN_MENU':          return handleMainMenu(user, psid, input);
@@ -98,24 +111,130 @@ function totalPages(allItems) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  WELCOME / REGISTER
+//  WELCOME / LOGIN / REGISTER
 // ═══════════════════════════════════════════════════════════════
 
 async function handleWelcome(user, psid, input) {
+  // Utilisateur déjà inscrit : proposer login
   if (user.isRegistered) {
-    user.isLoggedIn = true;
-    await user.save();
-    await userService.setState(user, 'MAIN_MENU');
-    await sendText(psid, M.WELCOME_BACK(user.email));
-    await sendText(psid, M.MAIN_MENU);
+    const captcha = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_LOGIN', { captcha });
+    await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
     return;
   }
+  // Nouvel utilisateur
   if (input.type === 'number' && input.value === 1) {
-    await userService.setState(user, 'REGISTER_EMAIL');
-    await sendText(psid, M.REGISTER_ASK_EMAIL);
+    // Inscription → captcha d'abord
+    const captcha = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_REGISTER', { captcha });
+    await sendText(psid, M.CAPTCHA(captcha.a, captcha.b));
     return;
   }
   await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
+}
+
+// ── Captcha avant inscription ────────────────────────────────────
+async function handleCaptchaRegister(user, psid, input) {
+  const { captcha } = user.stateData;
+  if (input.type === 'command' && input.value === 'ANNULER') {
+    await userService.setState(user, 'WELCOME');
+    await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
+    return;
+  }
+  if (input.type !== 'number' || input.value !== captcha.answer) {
+    // Nouveau captcha
+    const newCaptcha = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_REGISTER', { captcha: newCaptcha });
+    await sendText(psid, M.CAPTCHA_FAIL);
+    await sendText(psid, M.CAPTCHA(newCaptcha.a, newCaptcha.b));
+    return;
+  }
+  // Captcha validé → inscription
+  await userService.setState(user, 'REGISTER_EMAIL');
+  await sendText(psid, '✅ Vérification réussie !');
+  await sendText(psid, M.REGISTER_ASK_EMAIL);
+}
+
+// ── Captcha avant login ──────────────────────────────────────────
+async function handleCaptchaLogin(user, psid, input) {
+  const { captcha } = user.stateData;
+  if (input.type === 'command' && input.value === 'ANNULER') {
+    await userService.setState(user, 'WELCOME');
+    await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
+    return;
+  }
+  if (input.type !== 'number' || input.value !== captcha.answer) {
+    const newCaptcha = generateCaptcha();
+    await userService.setState(user, 'CAPTCHA_LOGIN', { captcha: newCaptcha });
+    await sendText(psid, M.CAPTCHA_FAIL);
+    await sendText(psid, M.CAPTCHA(newCaptcha.a, newCaptcha.b));
+    return;
+  }
+  // Captcha validé → si un seul compte lié au PSID, login direct
+  // sinon demander email/mdp
+  await userService.setState(user, 'LOGIN_EMAIL');
+  await sendText(psid, '✅ Vérification réussie !');
+  await sendText(psid, M.LOGIN_ASK_EMAIL);
+}
+
+// ── Login : email ────────────────────────────────────────────────
+async function handleLoginEmail(user, psid, input) {
+  if (input.type === 'command' && input.value === 'ANNULER') {
+    await userService.setState(user, 'WELCOME');
+    await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
+    return;
+  }
+  const email = (input.value || '').trim().toLowerCase();
+  if (!isValidEmail(email)) {
+    await sendText(psid, M.REGISTER_EMAIL_INVALID);
+    return;
+  }
+  await userService.setState(user, 'LOGIN_PASSWORD', { loginEmail: email });
+  await sendText(psid, M.LOGIN_ASK_PASSWORD);
+}
+
+// ── Login : mot de passe ─────────────────────────────────────────
+async function handleLoginPassword(user, psid, input) {
+  if (input.type === 'command' && input.value === 'ANNULER') {
+    await userService.setState(user, 'WELCOME');
+    await sendText(psid, M.WELCOME(user.facebookName || 'ami'));
+    return;
+  }
+  const password = input.value || '';
+  const { loginEmail } = user.stateData;
+
+  // Chercher l'utilisateur par email
+  const User = require('../models/User');
+  const target = await User.findOne({ email: loginEmail });
+  if (!target || !(await target.verifyPassword(password))) {
+    await sendText(psid, M.LOGIN_WRONG);
+    await sendText(psid, M.LOGIN_ASK_PASSWORD);
+    return;
+  }
+
+  // Succès : fusionner le compte si nécessaire
+  if (target.psid !== user.psid) {
+    // Ce PSID se connecte à un compte existant : on transfère la session
+    target.isLoggedIn = true;
+    target.lastActivity = new Date();
+    // On réinitialise l'ancien user fantôme
+    user.state = 'WELCOME';
+    user.stateData = {};
+    await user.save();
+    // Utiliser le compte cible pour la session
+    target.psid = user.psid; // lier ce PSID au compte
+    target.state = 'MAIN_MENU';
+    target.stateData = {};
+    await target.save();
+  } else {
+    target.isLoggedIn = true;
+    target.state = 'MAIN_MENU';
+    target.stateData = {};
+    await target.save();
+  }
+
+  await sendText(psid, M.LOGIN_SUCCESS(loginEmail));
+  await sendText(psid, M.MAIN_MENU);
 }
 
 async function handleRegisterEmail(user, psid, input) {
@@ -152,10 +271,6 @@ async function handleRegisterPassword(user, psid, input) {
   await sendText(psid, M.REGISTER_SUCCESS(user.email));
   await sendText(psid, M.MAIN_MENU);
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  MAIN MENU
-// ═══════════════════════════════════════════════════════════════
 
 async function handleMainMenu(user, psid, input) {
   if (input.type !== 'number') {
