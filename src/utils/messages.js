@@ -1,29 +1,39 @@
-/**
- * Centralisation de tous les messages du bot
- * Facile à modifier / traduire
- */
-
 const SEP = '━━━━━━━━━━━━━━━━━━';
+const PAGE_SIZE = 8; // items par page
+
+// Helper pagination
+function buildPagedList({ title, step, items, page, totalPages, keyField, labelField, hasNext, hasPrev }) {
+  let msg = `${SEP}\n🛒 ${title}\n${SEP}\n\n`;
+  if (totalPages > 1) msg += `📄 Page ${page}/${totalPages}\n\n`;
+  items.forEach((item, i) => {
+    msg += `${i + 1} - ${item[labelField]}\n`;
+  });
+  msg += '\n';
+  if (hasNext) msg += `9 - ➡️ Suite\n`;
+  msg += `0 - ↩ Retour`;
+  return msg;
+}
 
 const M = {
+
+  PAGE_SIZE,
 
   // ── Bienvenue ──────────────────────────────
   WELCOME: (name) =>
 `👋 Bienvenue ${name} sur ProxyBot !
 
-Ce bot vous permet d'acheter des proxies mobiles facilement.
+Ce bot vous permet d'acheter des proxies mobiles 4G facilement.
 
 ${SEP}
 Vous n'avez pas encore de compte.
 
-Tapez 1 pour créer votre compte
-Tapez 0 pour annuler`,
+Tapez 1 pour créer votre compte`,
 
   WELCOME_BACK: (email) =>
 `👋 Bon retour, ${email} !
 
 ${SEP}
-Tapez 9 pour accéder au menu principal`,
+Tapez 9 pour le menu principal`,
 
   // ── Inscription ────────────────────────────
   REGISTER_ASK_EMAIL:
@@ -36,7 +46,7 @@ Entrez votre adresse email :
   REGISTER_EMAIL_INVALID:
 `❌ Format d'email invalide.
 
-Exemple valide : utilisateur@gmail.com
+Exemple : utilisateur@gmail.com
 
 Veuillez réessayer :`,
 
@@ -64,7 +74,7 @@ Veuillez réessayer :`,
 📧 Email : ${email}
 
 ${SEP}
-Tapez 9 pour accéder au menu principal`,
+Tapez 9 pour le menu principal`,
 
   // ── Menu principal ─────────────────────────
   MAIN_MENU:
@@ -73,10 +83,11 @@ Tapez 9 pour accéder au menu principal`,
 ${SEP}
 
 1 - 🛒 Acheter un proxy
-2 - 👤 Mon profil
-3 - 🚪 Se déconnecter
+2 - 👤 Mon profil & proxies
+3 - 💳 Recharger mon compte
 4 - 💬 Contacter le support
 5 - 💰 Voir les prix
+6 - 🚪 Se déconnecter
 
 ${SEP}
 Répondez avec un chiffre :`,
@@ -84,8 +95,8 @@ Répondez avec un chiffre :`,
   // ── Achat ──────────────────────────────────
   BUY_SELECT_PKG:
 `${SEP}
-🛒 ACHETER UN PROXY — Étape 1/5
-Package
+🛒 ACHETER UN PROXY — Étape 1/7
+📦 Package
 ${SEP}
 
 1 - 🥇 Golden (IP Mobile Premium)
@@ -95,8 +106,8 @@ ${SEP}
 
   BUY_SELECT_PROTO:
 `${SEP}
-🛒 ACHETER UN PROXY — Étape 2/5
-Protocole
+🛒 ACHETER UN PROXY — Étape 2/7
+📡 Protocole
 ${SEP}
 
 1 - HTTP / HTTPS
@@ -105,29 +116,69 @@ ${SEP}
 0 - ↩ Retour`,
 
   BUY_SELECT_DURATION: (options) => {
-    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 3/5\nDurée\n${SEP}\n\n`;
+    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 3/7\n⏱ Durée\n${SEP}\n\n`;
     options.forEach((o, i) => {
-      msg += `${i + 1} - ${o.label}  💵 $${o.price.toFixed(2)}\n`;
+      msg += `${i + 1} - ${o.label.padEnd(12)} 💵 $${o.price.toFixed(2)}\n`;
     });
     msg += `\n0 - ↩ Retour`;
     return msg;
   },
 
-  BUY_SELECT_COUNTRY: (countries) => {
-    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 4/5\nPays\n${SEP}\n\n`;
+  // Pays — paginé
+  BUY_SELECT_COUNTRY: (countries, page, totalPages) => {
+    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 4/7\n🌍 Pays\n${SEP}\n`;
+    if (totalPages > 1) msg += `\n📄 Page ${page}/${totalPages}\n`;
+    msg += '\n';
     countries.forEach((c, i) => {
       msg += `${i + 1} - ${c.country_name}\n`;
     });
-    msg += `\n0 - ↩ Retour`;
+    msg += '\n';
+    if (page < totalPages) msg += `9 - ➡️ Suite\n`;
+    msg += `0 - ↩ Retour`;
     return msg;
   },
 
-  BUY_SELECT_PARENT: (parents) => {
-    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 5/5\nChoisir un serveur\n${SEP}\n\n`;
-    parents.slice(0, 10).forEach((p, i) => {
-      msg += `${i + 1} - ${p.technology || 'Standard'} | Usage: ${p.usage < 0 ? 'N/A' : p.usage + '%'}\n`;
+  // Villes — paginé
+  BUY_SELECT_CITY: (cities, page, totalPages) => {
+    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 5/7\n🏙 Ville\n${SEP}\n`;
+    if (totalPages > 1) msg += `\n📄 Page ${page}/${totalPages}\n`;
+    msg += '\n';
+    cities.forEach((c, i) => {
+      msg += `${i + 1} - ${c.city_name}\n`;
     });
-    msg += `\n0 - ↩ Retour`;
+    msg += '\n';
+    if (page < totalPages) msg += `9 - ➡️ Suite\n`;
+    msg += `0 - ↩ Retour`;
+    return msg;
+  },
+
+  // Opérateurs — paginé
+  BUY_SELECT_PROVIDER: (providers, page, totalPages) => {
+    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 6/7\n📶 Opérateur mobile\n${SEP}\n`;
+    if (totalPages > 1) msg += `\n📄 Page ${page}/${totalPages}\n`;
+    msg += '\n';
+    providers.forEach((p, i) => {
+      msg += `${i + 1} - ${p.service_provider_name}\n`;
+    });
+    msg += '\n';
+    if (page < totalPages) msg += `9 - ➡️ Suite\n`;
+    msg += `0 - ↩ Retour`;
+    return msg;
+  },
+
+  // Proxies parents — paginé (uniquement is_available + ACTIVE)
+  BUY_SELECT_PARENT: (parents, page, totalPages) => {
+    let msg = `${SEP}\n🛒 ACHETER UN PROXY — Étape 7/7\n🖥 Choisir un serveur\n${SEP}\n`;
+    if (totalPages > 1) msg += `\n📄 Page ${page}/${totalPages}\n`;
+    msg += '\n';
+    parents.forEach((p, i) => {
+      const tech  = p.technology || '4G';
+      const usage = (p.usage !== undefined && p.usage >= 0) ? `${p.usage}%` : 'N/A';
+      msg += `${i + 1} - ${tech} | Usage: ${usage}\n`;
+    });
+    msg += '\n';
+    if (page < totalPages) msg += `9 - ➡️ Suite\n`;
+    msg += `0 - ↩ Retour`;
     return msg;
   },
 
@@ -143,6 +194,8 @@ ${SEP}
 📡 Protocole: ${data.proto.toUpperCase()}
 ⏱  Durée    : ${data.duration}
 🌍 Pays     : ${data.country}
+🏙  Ville    : ${data.city || 'N/A'}
+📶 Opérateur: ${data.provider || 'N/A'}
 💵 Prix     : $${data.price}${balLine}
 
 ${SEP}
@@ -155,11 +208,10 @@ ${SEP}
   BUY_INSUFFICIENT_BALANCE: (price, balance) =>
 `❌ Solde insuffisant.
 
-💵 Prix requis   : $${price.toFixed(2)}
-💳 Votre solde  : $${balance.toFixed(2)}
+💵 Prix requis  : $${(+price).toFixed(2)}
+💳 Votre solde : $${(+balance).toFixed(2)}
 
-Contactez le support pour recharger votre solde.
-Tapez 4 depuis le menu ou tapez 9.`,
+Pour recharger votre compte, tapez 9 puis choisissez 3.`,
 
   BUY_LOADING:
 `⏳ Achat en cours, veuillez patienter...`,
@@ -173,56 +225,97 @@ ${SEP}
 🔌 Port    : ${proxy.port}
 👤 Login   : ${proxy.username}
 🔑 Pass    : ${proxy.password}
-📡 Proto   : ${proxy.protocol.toUpperCase()}
-🌍 Pays    : ${proxy.country}
+📡 Proto   : ${(proxy.protocol || '').toUpperCase()}
+🌍 Pays    : ${proxy.country || 'N/A'}
 ⏱  Expire  : ${proxy.expiresAt ? new Date(proxy.expiresAt).toLocaleDateString('fr-FR') : 'N/A'}
 
-📋 Proxy complet :
+📋 Chaîne proxy :
 ${proxy.protocol}://${proxy.username}:${proxy.password}@${proxy.ip}:${proxy.port}
 
 ${SEP}
-Tapez 9 pour revenir au menu`,
+Tapez 9 pour le menu`,
 
   BUY_ERROR: (msg) =>
 `❌ Erreur lors de l'achat :
 ${msg}
 
-Veuillez réessayer ou contacter le support (tapez 4 depuis le menu).
+Réessayez ou contactez le support (menu → 4).
 Tapez 9 pour le menu.`,
+
+  // ── Top Up ─────────────────────────────────
+  TOPUP_MENU: (balance) =>
+`${SEP}
+💳 RECHARGER MON COMPTE
+${SEP}
+
+💰 Solde actuel : $${(+balance).toFixed(2)}
+
+Pour recharger, entrez le montant souhaité en $
+(ex: 10 pour $10.00)
+
+${process.env.PAYMENT_INFO || '📲 Contactez le support pour les instructions de paiement.'}
+
+${SEP}
+(Tapez "annuler" pour revenir au menu)`,
+
+  TOPUP_INVALID:
+`❌ Montant invalide. Entrez un nombre entier positif (ex: 5, 10, 20).`,
+
+  TOPUP_PENDING: (amount) =>
+`✅ Demande de recharge envoyée !
+
+💵 Montant demandé : $${(+amount).toFixed(2)}
+
+${process.env.PAYMENT_INFO || '📲 Contactez le support pour finaliser le paiement.'}
+
+Notre équipe créditera votre compte après confirmation du paiement.
+
+${SEP}
+Tapez 9 pour le menu`,
+
+  TOPUP_APPROVED: (amount, newBalance) =>
+`✅ Recharge approuvée !
+
+💵 Montant crédité : $${(+amount).toFixed(2)}
+💳 Nouveau solde   : $${(+newBalance).toFixed(2)}
+
+${SEP}
+Tapez 9 pour le menu`,
 
   // ── Profil ─────────────────────────────────
   PROFILE: (user, proxies) => {
     const active  = proxies.filter(p => p.status === 'ACTIF');
     const expired = proxies.filter(p => p.status === 'EXPIRÉ');
-
     let msg = `${SEP}\n👤 MON PROFIL\n${SEP}\n\n`;
     msg += `📧 Email   : ${user.email}\n`;
+    msg += `💳 Solde   : $${(+(user.balance || 0)).toFixed(2)}\n`;
     msg += `📅 Inscrit : ${new Date(user.createdAt).toLocaleDateString('fr-FR')}\n\n`;
 
     msg += `${SEP}\n✅ PROXIES ACTIFS (${active.length})\n${SEP}\n`;
-    if (active.length === 0) {
+    if (!active.length) {
       msg += `Aucun proxy actif.\n`;
     } else {
-      active.forEach((p, i) => {
+      active.slice(0, 5).forEach((p, i) => {
         const days = p.daysLeft();
         msg += `\n${i + 1}. ${p.ip}:${p.port}\n`;
-        msg += `   📡 ${p.protocol.toUpperCase()} | 🌍 ${p.country || '—'}\n`;
-        msg += `   ⏱  Expire : ${p.expiresAt ? new Date(p.expiresAt).toLocaleDateString('fr-FR') : 'N/A'}\n`;
-        msg += `   📆 Restant : ${days !== null ? days + ' jour(s)' : 'N/A'}\n`;
+        msg += `   📡 ${(p.protocol||'').toUpperCase()} | 🌍 ${p.country || '—'}\n`;
+        msg += `   ⏱ ${p.expiresAt ? new Date(p.expiresAt).toLocaleDateString('fr-FR') : 'N/A'}`;
+        msg += ` (${days !== null ? days + 'j' : 'N/A'})\n`;
       });
+      if (active.length > 5) msg += `\n... et ${active.length - 5} autre(s)\n`;
     }
 
-    msg += `\n${SEP}\n❌ PROXIES EXPIRÉS (${expired.length})\n${SEP}\n`;
-    if (expired.length === 0) {
+    msg += `\n${SEP}\n❌ EXPIRÉS (${expired.length})\n${SEP}\n`;
+    if (!expired.length) {
       msg += `Aucun proxy expiré.\n`;
     } else {
-      expired.slice(0, 5).forEach((p, i) => {
-        msg += `\n${i + 1}. ${p.ip}:${p.port} — EXPIRÉ\n`;
-        msg += `   🌍 ${p.country || '—'} | acheté le ${new Date(p.purchasedAt).toLocaleDateString('fr-FR')}\n`;
+      expired.slice(0, 3).forEach((p, i) => {
+        msg += `\n${i + 1}. ${p.ip}:${p.port} — ${p.country || '—'}\n`;
       });
+      if (expired.length > 3) msg += `... et ${expired.length - 3} autre(s)\n`;
     }
 
-    msg += `\n${SEP}\n1 - 🔄 Renouveler un proxy\n0 - ↩ Retour\n9 - 🏠 Menu principal`;
+    msg += `\n${SEP}\n1 - 🔄 Renouveler un proxy\n0 - ↩ Retour\n9 - 🏠 Menu`;
     return msg;
   },
 
@@ -232,76 +325,62 @@ Tapez 9 pour le menu.`,
 💰 GRILLE TARIFAIRE
 ${SEP}
 
-🥇 PACKAGE GOLDEN (Mobile Premium)
-━━━━━━━━━━━━
-• 2 heures    → $0.35
-• 12 heures   → $0.80
-• 1 jour      → $1.50
-• 3 jours     → $3.50
-• 7 jours     → $7.00
-• 15 jours    → $13.00
-• 30 jours    → $24.00
+🥇 GOLDEN (Mobile Premium)
+• 2 heures   → $0.35
+• 12 heures  → $0.80
+• 1 jour     → $1.50
+• 3 jours    → $3.50
+• 7 jours    → $7.00
+• 15 jours   → $13.00
+• 30 jours   → $24.00
 
-🥈 PACKAGE SILVER (Mobile Standard)
-━━━━━━━━━━━━
-• 2 jours     → $2.00
-• 7 jours     → $5.50
-• 30 jours    → $15.00
+🥈 SILVER (Mobile Standard)
+• 2 jours    → $2.00
+• 7 jours    → $5.50
+• 30 jours   → $15.00
 
 ${SEP}
-Pour acheter, tapez 9 puis choisissez 1.
-
 0 - ↩ Retour | 9 - 🏠 Menu`,
 
   // ── Support ────────────────────────────────
   SUPPORT_ASK:
 `${SEP}
-💬 CONTACTER LE SUPPORT
+💬 SUPPORT
 ${SEP}
 
-Écrivez votre message ci-dessous et notre équipe vous répondra rapidement.
+Écrivez votre message, notre équipe vous répondra rapidement.
 
 (Tapez "annuler" pour annuler)`,
 
   SUPPORT_SENT:
 `✅ Message envoyé au support !
 
-Notre équipe vous répondra dès que possible.
-
 ${SEP}
-Tapez 9 pour revenir au menu`,
+Tapez 9 pour le menu`,
 
-  // ── Déconnexion ────────────────────────────
+  // ── Divers ─────────────────────────────────
   LOGOUT:
-`🚪 Vous avez été déconnecté avec succès.
+`🚪 Déconnecté avec succès.
+À bientôt ! Tapez n'importe quoi pour recommencer.`,
 
-À bientôt !
-Tapez n'importe quoi pour recommencer.`,
-
-  // ── Erreurs globales ───────────────────────
   INVALID_INPUT:
 `⚠️ Entrée invalide.
-
-Répondez avec un chiffre parmi les options proposées.
-(Tapez 0 pour retour, 9 pour le menu principal)`,
+Répondez avec un chiffre parmi les options.
+(0 = retour, 9 = menu)`,
 
   INVALID_OPTION: (max) =>
-`⚠️ Option invalide. Choisissez entre 1 et ${max}.
-(Tapez 0 pour retour, 9 pour le menu)`,
+`⚠️ Option invalide (1 à ${max}).
+(0 = retour, 9 = menu)`,
 
   CANCELLED:
 `🚫 Action annulée.
-
-Tapez 9 pour le menu principal.`,
+Tapez 9 pour le menu.`,
 
   ERROR_GENERIC:
-`❌ Une erreur s'est produite.
-
-Veuillez réessayer ou tapez 9 pour le menu principal.`,
+`❌ Une erreur s'est produite. Réessayez ou tapez 9 pour le menu.`,
 
   NOT_LOGGED_IN:
 `🔒 Vous n'êtes pas connecté.
-
 Tapez n'importe quoi pour créer ou retrouver votre compte.`
 };
 

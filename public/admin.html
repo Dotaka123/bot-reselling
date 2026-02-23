@@ -153,6 +153,7 @@
   .activity-dot.purchase { background: var(--green); }
   .activity-dot.register { background: var(--accent); }
   .activity-dot.support  { background: var(--yellow); }
+  .activity-dot.topup    { background: #a855f7; }
   .activity-label { font-size: .88rem; }
   .activity-meta  { font-size: .78rem; color: var(--muted); margin-top: 2px; }
 
@@ -199,6 +200,7 @@
     <button data-tab="users">👤 Utilisateurs</button>
     <button data-tab="proxies">🌐 Proxies</button>
     <button data-tab="support">💬 Support</button>
+    <button data-tab="topups">💳 Recharges</button>
     <button data-tab="activity">🕐 Activité</button>
   </nav>
 
@@ -273,6 +275,25 @@
       </div>
     </div>
 
+    <!-- TOPUPS -->
+    <div class="tab-content" id="tab-topups">
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Demandes de recharge</h3>
+          <div class="controls">
+            <select id="topup-filter">
+              <option value="PENDING">En attente</option>
+              <option value="APPROVED">Approuvées</option>
+              <option value="REJECTED">Rejetées</option>
+              <option value="">Toutes</option>
+            </select>
+          </div>
+        </div>
+        <div id="topups-table-body"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="topups-pagination"></div>
+      </div>
+    </div>
+
     <!-- ACTIVITY -->
     <div class="tab-content" id="tab-activity">
       <div class="table-card">
@@ -291,7 +312,7 @@ const API = (path) => `/admin/api${path}`;
 const headers = () => ({ 'x-admin-token': ADMIN_TOKEN, 'Content-Type': 'application/json' });
 
 // ── Pagination state ───────────────────────────────────────
-const pages = { users: 1, proxies: 1, support: 1 };
+const pages = { users: 1, proxies: 1, support: 1, topups: 1 };
 
 // ── Login ──────────────────────────────────────────────────
 document.getElementById('login-btn').addEventListener('click', async () => {
@@ -321,6 +342,7 @@ document.querySelectorAll('nav button').forEach(btn => {
     if (btn.dataset.tab === 'users')    loadUsers();
     if (btn.dataset.tab === 'proxies')  loadProxies();
     if (btn.dataset.tab === 'support')  loadSupport();
+    if (btn.dataset.tab === 'topups')   loadTopups();
     if (btn.dataset.tab === 'activity') loadActivity();
   });
 });
@@ -364,7 +386,7 @@ async function loadStats() {
     <div class="stat-card red">
       <div class="label">Proxies expirés</div>
       <div class="value">${data.proxies.expired}</div>
-      <div class="sub">Tickets ouverts : ${data.support.openTickets}</div>
+      <div class="sub">Tickets ouverts : ${data.support.openTickets} · Recharges en attente : ${data.topups?.pending || 0}</div>
     </div>
   `;
 
@@ -541,6 +563,45 @@ async function loadActivity() {
 }
 
 // ── Helpers ────────────────────────────────────────────────
+// ── Topups ─────────────────────────────────────────────────────
+document.getElementById('topup-filter').addEventListener('change', () => { pages.topups = 1; loadTopups(); });
+
+async function loadTopups() {
+  const status = document.getElementById('topup-filter').value;
+  const qs = `?page=${pages.topups}&limit=20${status ? `&status=${encodeURIComponent(status)}` : ''}`;
+  const data = await apiFetch(`/topups${qs}`);
+  if (!data) return;
+  const body = data.topups.length
+    ? `<table><thead><tr><th>Email</th><th>Montant</th><th>Solde</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead><tbody>
+       ${data.topups.map(t => `<tr>
+        <td>${esc(t.userId?.email || t.email || t.psid)}</td>
+        <td><strong style="color:var(--green)">$${(+t.amount).toFixed(2)}</strong></td>
+        <td>$${(+(t.userId?.balance || 0)).toFixed(2)}</td>
+        <td>${topupBadge(t.status)}</td>
+        <td style="color:var(--muted)">${fmtDate(t.createdAt)}</td>
+        <td>${t.status === 'PENDING'
+          ? `<button onclick="processTopup('${t._id}','APPROVED')" style="background:rgba(16,185,129,.15);border:1px solid var(--green);color:var(--green);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;margin-right:4px;font-weight:600">✅ Approuver</button>
+             <button onclick="processTopup('${t._id}','REJECTED')" style="background:rgba(239,68,68,.1);border:1px solid var(--red);color:var(--red);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600">❌ Rejeter</button>`
+          : '<span style="color:var(--muted);font-size:.8rem">—</span>'}</td>
+       </tr>`).join('')}
+       </tbody></table>`
+    : '<div class="loading">Aucune demande</div>';
+  document.getElementById('topups-table-body').innerHTML = body;
+  renderPagination('topups-pagination', pages.topups, data.pages, (p) => { pages.topups = p; loadTopups(); });
+}
+
+async function processTopup(id, status) {
+  if (!confirm(`${status === 'APPROVED' ? '✅ Approuver' : '❌ Rejeter'} cette recharge ?`)) return;
+  const result = await apiFetch(`/topups/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  if (result) { loadTopups(); loadStats(); }
+}
+
+function topupBadge(s) {
+  const m = { PENDING: 'yellow', APPROVED: 'green', REJECTED: 'red' };
+  const l = { PENDING: 'En attente', APPROVED: 'Approuvée', REJECTED: 'Rejetée' };
+  return `<span class="badge ${m[s]||'gray'}">${l[s]||s}</span>`;
+}
+
 async function apiFetch(path, opts = {}) {
   try {
     const res = await fetch(API(path), { headers: headers(), ...opts });
