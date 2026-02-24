@@ -158,17 +158,14 @@ async function handleMessage(psid, messageText) {
 //  WELCOME / FACEBOOK VERIFICATION / CAPTCHA / LOGIN / REGISTER
 // ═══════════════════════════════════════════════════════════════
 
-async function handleWelcome(user, psid, input) {
-  // Send welcome message and ask to verify Facebook subscription
+async function handleWelcome(user, psid) {
+  // Send welcome message and ask user to type done.
   await sendText(psid, M.FACEBOOK_VERIFICATION_PENDING);
   await userService.setState(user, 'FB_VERIFICATION', { step: 1 });
 }
 
 async function handleFBVerification(user, psid, input) {
   const normalizedText = input.type === 'text' ? input.value.trim().toLowerCase() : '';
-
-  // Check if user typed "done"
-    // "done" now unlocks the bot directly (no external subscription check)
     await sendText(psid, '✅ Done received! Access granted.');
     await user.updateOne({ isPageSubscriber: true });
     await userService.setState(user, 'WELCOME');
@@ -182,7 +179,6 @@ async function handleFBVerification(user, psid, input) {
     return;
   }
 
-  // User didn't type "done"
   await sendText(psid, M.FACEBOOK_VERIFICATION_ERROR);
   await sendText(psid, `Visit: ${FACEBOOK_PAGE_URL}`);
   await sendText(psid, M.FACEBOOK_VERIFICATION_PENDING);
