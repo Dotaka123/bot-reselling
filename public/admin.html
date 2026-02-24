@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>ProxyBot — Admin Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c12;
+    --surface: #12151e;
+    --surface2: #1a1e2e;
+    --border: #252a3a;
+    --accent: #4f6ef7;
+    --accent2: #7c3aed;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { 
+    background: var(--bg); 
+    color: var(--text); 
+    font-family: 'Segoe UI', system-ui, sans-serif; 
+    min-height: 100vh; 
+    overflow-x: hidden;
+  }
+
+  /* ── Login screen ─── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; background: var(--bg); padding: 16px;
+  }
+  #login-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 40px 24px; width: 100%; max-width: 400px; text-align: center;
+  }
+  #login-box h1 { font-size: 1.5rem; margin-bottom: 8px; }
+  #login-box p  { color: var(--muted); margin-bottom: 28px; font-size: 0.9rem; }
+  #login-box input {
+    width: 100%; padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 1rem; margin-bottom: 14px; font-size: 16px;
+  }
+  #login-box button {
+    width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none;
+    border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
+    transition: opacity .2s;
+  }
+  #login-box button:hover { opacity: .85; }
+  #login-error { color: var(--red); margin-top: 12px; font-size: .85rem; }
+
+  /* ── App ─── */
+  #app { display: none; }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 16px; display: flex; align-items: center; justify-content: space-between;
+    height: 60px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap;
+  }
+  .logo { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+  .logo span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .badge-api { font-size: .75rem; padding: 4px 8px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 20px; white-space: nowrap; }
+  .badge-api.ok  { border-color: var(--green); color: var(--green); }
+  .badge-api.err { border-color: var(--red);   color: var(--red); }
+  .btn-logout { background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: .8rem; }
+  .btn-logout:hover { color: var(--text); }
+
+  /* ── Nav ─── */
+  nav { 
+    display: flex; gap: 4px; padding: 0 16px; background: var(--surface);
+    border-bottom: 1px solid var(--border); overflow-x: auto; width: 100%;
+  }
+  nav button {
+    background: none; border: none; color: var(--muted); padding: 12px 12px;
+    cursor: pointer; font-size: .8rem; white-space: nowrap; border-bottom: 2px solid transparent;
+    transition: color .2s; flex-shrink: 0;
+  }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav button:hover  { color: var(--text); }
+
+  /* ── Layout ─── */
+  main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Stats cards ─── */
+  .stats-grid { 
+    display: grid; 
+    grid-template-columns: 1fr;
+    gap: 12px; 
+    margin-bottom: 20px; 
+  }
+  @media (min-width: 480px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .stat-card .label { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+  .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+  .stat-card .sub   { color: var(--muted); font-size: .75rem; }
+  .stat-card.green .value { color: var(--green); }
+  .stat-card.blue  .value { color: var(--accent); }
+  .stat-card.red  .value { color: var(--red); }
+
+  /* ── Charts ─── */
+  .charts-row { 
+    display: grid; 
+    grid-template-columns: 1fr; 
+    gap: 12px; 
+    margin-bottom: 20px; 
+  }
+  @media (min-width: 768px) {
+    .charts-row { grid-template-columns: 2fr 1fr; }
+  }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
+  }
+  .chart-card h3 { font-size: .9rem; margin-bottom: 12px; color: var(--muted); }
+
+  /* ── Tables ─── */
+  .table-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .table-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap;
+  }
+  .table-toolbar h3 { font-size: .9rem; font-weight: 600; }
+  .table-toolbar .controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .table-toolbar input, .table-toolbar select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: .8rem;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { background: var(--surface2); padding: 10px; font-size: .75rem;
+       text-transform: uppercase; letter-spacing: .06em; color: var(--muted); text-align: left; }
+  td { padding: 10px; font-size: .8rem; border-top: 1px solid var(--border); word-break: break-word; }
+  tr:hover td { background: var(--surface2); }
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 6px;
+                padding: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .pagination button {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: .75rem;
+  }
+  .pagination button:disabled { opacity: .4; cursor: default; }
+  .pagination .info { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+
+  /* ── Badges ─── */
+  .badge {
+    display: inline-block; padding: 3px 8px; border-radius: 20px;
+    font-size: .7rem; font-weight: 600;
+  }
+  .badge.green  { background: rgba(16,185,129,.15); color: var(--green); }
+  .badge.red    { background: rgba(239,68,68,.15);  color: var(--red); }
+  .badge.yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge.blue   { background: rgba(79,110,247,.15); color: var(--accent); }
+  .badge.gray   { background: rgba(100,116,139,.15);color: var(--muted); }
+
+  /* ── Activity feed ─── */
+  .activity-list { padding: 4px 0; }
+  .activity-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .activity-dot.purchase { background: var(--green); }
+  .activity-dot.register { background: var(--accent); }
+  .activity-dot.support  { background: var(--yellow); }
+  .activity-dot.topup    { background: #a855f7; }
+  .activity-label { font-size: .8rem; }
+  .activity-meta  { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+
+  /* ── Loading ─── */
+  .loading { text-align: center; padding: 30px 16px; color: var(--muted); font-size: .9rem; }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border);
+             border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Mobile Responsive ─── */
+  @media (max-width: 480px) {
+    header { padding: 0 12px; }
+    nav { padding: 0 12px; }
+    main { padding: 12px; }
+    nav button { padding: 10px 8px; font-size: .75rem; }
+    .logo { font-size: .9rem; }
+    .badge-api { font-size: .7rem; padding: 2px 6px; }
+    .btn-logout { padding: 4px 8px; font-size: .75rem; }
+    table { font-size: .75rem; }
+    th { padding: 8px; font-size: .7rem; }
+    td { padding: 8px; font-size: .75rem; }
+    .stat-card { padding: 12px; }
+    .stat-card .value { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div id="login-box">
+    <div style="font-size:2.4rem;margin-bottom:12px">🛡️</div>
+    <h1>ProxyBot Admin</h1>
+    <p>Enter your admin token</p>
+    <input type="password" id="token-input" placeholder="Admin token…" />
+    <button id="login-btn">Login</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="logo">Proxy<span>Bot</span> <span style="color:var(--muted);font-size:.75rem;font-weight:400">Admin</span></div>
+    <div class="header-right">
+      <span class="badge-api" id="api-balance-badge">Balance: …</span>
+      <button class="btn-logout" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="active" data-tab="overview">📊 Overview</button>
+    <button data-tab="users">👤 Users</button>
+    <button data-tab="proxies">🌐 Proxies</button>
+    <button data-tab="support">💬 Support</button>
+    <button data-tab="topups">💳 Top-ups</button>
+    <button data-tab="activity">🕐 Activity</button>
+  </nav>
+
+  <main>
+
+    <!-- OVERVIEW -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="stats-grid" id="stats-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Revenue (Last 30 Days)</h3>
+          <canvas id="revenue-chart" height="80"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Proxy Status</h3>
+          <canvas id="proxy-status-chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="tab-content" id="tab-users">
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Users</h3>
+          <div class="controls">
+            <input type="text" id="user-search" placeholder="Email or name…" style="width:100%;max-width:200px" />
+          </div>
+        </div>
+        <div id="users-table-body"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="users-pagination"></div>
+      </div>
+    </div>
+
+    <!-- PROXIES -->
+    <div class="tab-content" id="tab-proxies">
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Purchased Proxies</h3>
+          <div class="controls">
+            <select id="proxy-filter">
+              <option value="">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="EXPIRED">Expired</option>
+              <option value="SUSPENDED">Suspended</option>
+            </select>
+          </div>
+        </div>
+        <div id="proxies-table-body"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="proxies-pagination"></div>
+      </div>
+    </div>
+
+    <!-- SUPPORT -->
+    <div class="tab-content" id="tab-support">
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Support Messages</h3>
+          <div class="controls">
+            <select id="support-filter">
+              <option value="">All</option>
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </div>
+        </div>
+        <div id="support-table-body"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="support-pagination"></div>
+      </div>
+    </div>
+
+    <!-- TOPUPS -->
+    <div class="tab-content" id="tab-topups">
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Top-up Requests</h3>
+          <div class="controls">
+            <select id="topup-filter">
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="">All</option>
+            </select>
+          </div>
+        </div>
+        <div id="topups-table-body"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="topups-pagination"></div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY -->
+    <div class="tab-content" id="tab-activity">
+      <div class="table-card">
+        <div class="table-toolbar"><h3>Recent Activity</h3></div>
+        <div class="activity-list" id="activity-list"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────
+let ADMIN_TOKEN = '';
+const API = (path) => `/admin/api${path}`;
+const headers = () => ({ 'x-admin-token': ADMIN_TOKEN, 'Content-Type': 'application/json' });
+
+// ── Pagination state ───────────────────────────────────────
+const pages = { users: 1, proxies: 1, support: 1, topups: 1 };
+
+// ── Login ──────────────────────────────────────────────────
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const token = document.getElementById('token-input').value.trim();
+  if (!token) return;
+  try {
+    const res = await fetch(API('/stats'), { headers: { 'x-admin-token': token } });
+    if (!res.ok) throw new Error();
+    ADMIN_TOKEN = token;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initApp();
+  } catch {
+    document.getElementById('login-error').textContent = '❌ Invalid token or server unreachable.';
+  }
+});
+document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
+document.getElementById('logout-btn').addEventListener('click', () => { ADMIN_TOKEN = ''; location.reload(); });
+
+// ── Tab navigation ─────────────────────────────────────────
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    if (btn.dataset.tab === 'users')    loadUsers();
+    if (btn.dataset.tab === 'proxies')  loadProxies();
+    if (btn.dataset.tab === 'support')  loadSupport();
+    if (btn.dataset.tab === 'topups')   loadTopups();
+    if (btn.dataset.tab === 'activity') loadActivity();
+  });
+});
+
+// ── Init ───────────────────────────────────────────────────
+function initApp() {
+  loadStats();
+  loadRevenueChart();
+}
+
+// ── Stats ──────────────────────────────────────────────────
+async function loadStats() {
+  const data = await apiFetch('/stats');
+  if (!data) return;
+
+  const badge = document.getElementById('api-balance-badge');
+  if (data.apiBalance !== undefined && data.apiBalance !== 'N/A') {
+    badge.textContent = `Balance: $${(+data.apiBalance).toFixed(2)}`;
+    badge.className = 'badge-api ok';
+  } else {
+    badge.textContent = 'Balance: N/A';
+    badge.className = 'badge-api err';
+  }
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card green">
+      <div class="label">Total Revenue</div>
+      <div class="value">$${data.revenue.total}</div>
+      <div class="sub">This month: $${data.revenue.thisMonth}</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="label">Registered Users</div>
+      <div class="value">${data.users.registered}</div>
+      <div class="sub">Total PSID: ${data.users.total} · Active: ${data.users.active}</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="label">Active Proxies</div>
+      <div class="value">${data.proxies.active}</div>
+      <div class="sub">Total Sold: ${data.proxies.total}</div>
+    </div>
+    <div class="stat-card red">
+      <div class="label">Expired Proxies</div>
+      <div class="value">${data.proxies.expired}</div>
+      <div class="sub">Open Tickets: ${data.support.openTickets} · Pending Top-ups: ${data.topups?.pending || 0}</div>
+    </div>
+  `;
+
+  // Pie chart
+  const ctx2 = document.getElementById('proxy-status-chart').getContext('2d');
+  new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: ['Active', 'Expired'],
+      datasets: [{ data: [data.proxies.active, data.proxies.expired],
+        backgroundColor: ['#10b981','#ef4444'], borderWidth: 0 }]
+    },
+    options: { plugins: { legend: { labels: { color: '#e2e8f0' } } }, cutout: '65%' }
+  });
+}
+
+// ── Revenue chart ──────────────────────────────────────────
+async function loadRevenueChart() {
+  const data = await apiFetch('/revenue-chart?days=30');
+  if (!data) return;
+
+  const labels   = data.map(d => d._id.slice(5));
+  const revenues = data.map(d => +d.revenue.toFixed(2));
+  const counts   = data.map(d => d.count);
+
+  const ctx = document.getElementById('revenue-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Revenue ($)', data: revenues, backgroundColor: 'rgba(79,110,247,.7)', yAxisID: 'y' },
+        { label: 'Sales', data: counts, type: 'line', borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .4, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: '#1a1e2e' } },
+        y:  { ticks: { color: '#64748b' }, grid: { color: '#1a1e2e' }, position: 'left'  },
+        y2: { ticks: { color: '#64748b' }, grid: { display: false },   position: 'right' }
+      }
+    }
+  });
+}
+
+// ── Users ──────────────────────────────────────────────────
+let userSearchTimer;
+document.getElementById('user-search').addEventListener('input', () => {
+  clearTimeout(userSearchTimer);
+  userSearchTimer = setTimeout(() => { pages.users = 1; loadUsers(); }, 400);
+});
+
+async function loadUsers() {
+  const search = document.getElementById('user-search').value.trim();
+  const qs = `?page=${pages.users}&limit=20${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+  const data = await apiFetch(`/users${qs}`);
+  if (!data) return;
+
+  const body = data.users.length
+    ? `<table>
+        <thead><tr>
+          <th>Email</th><th>Facebook Name</th><th>PSID</th>
+          <th>Proxies</th><th>Spent</th><th>Status</th><th>Joined</th>
+        </tr></thead>
+        <tbody>${data.users.map(u => `
+          <tr>
+            <td>${u.email || '<span style="color:var(--muted)">—</span>'}</td>
+            <td>${u.facebookName || '—'}</td>
+            <td style="font-size:.7rem;color:var(--muted)">${u.psid}</td>
+            <td>${u.proxiesCount}</td>
+            <td>$${u.totalSpent}</td>
+            <td>${u.isLoggedIn ? '<span class="badge green">Logged In</span>' : '<span class="badge gray">Logged Out</span>'}</td>
+            <td style="color:var(--muted)">${fmtDate(u.createdAt)}</td>
+          </tr>`).join('')}
+        </tbody>
+       </table>`
+    : '<div class="loading">No users found</div>';
+
+  document.getElementById('users-table-body').innerHTML = body;
+  renderPagination('users-pagination', pages.users, data.pages, (p) => { pages.users = p; loadUsers(); });
+}
+
+// ── Proxies ────────────────────────────────────────────────
+document.getElementById('proxy-filter').addEventListener('change', () => { pages.proxies = 1; loadProxies(); });
+
+async function loadProxies() {
+  const status = document.getElementById('proxy-filter').value;
+  const qs = `?page=${pages.proxies}&limit=20${status ? `&status=${status}` : ''}`;
+  const data = await apiFetch(`/proxies${qs}`);
+  if (!data) return;
+
+  const body = data.proxies.length
+    ? `<table>
+        <thead><tr>
+          <th>IP:Port</th><th>Protocol</th><th>Country</th>
+          <th>Duration</th><th>Price</th><th>Status</th><th>User</th><th>Purchased</th>
+        </tr></thead>
+        <tbody>${data.proxies.map(p => `
+          <tr>
+            <td style="font-family:monospace;font-size:.7rem">${p.ip}:${p.port}</td>
+            <td>${p.protocol?.toUpperCase()}</td>
+            <td>${p.country || '—'}</td>
+            <td>${p.packageLabel || (p.duration + 'd')}</td>
+            <td>$${p.price || 0}</td>
+            <td>${statusBadge(p.status)}</td>
+            <td style="font-size:.7rem">${p.userId?.email || p.psid?.slice(-6)}</td>
+            <td style="color:var(--muted);font-size:.75rem">${fmtDate(p.purchasedAt)}</td>
+          </tr>`).join('')}
+        </tbody>
+       </table>`
+    : '<div class="loading">No proxies</div>';
+
+  document.getElementById('proxies-table-body').innerHTML = body;
+  renderPagination('proxies-pagination', pages.proxies, data.pages, (p) => { pages.proxies = p; loadProxies(); });
+}
+
+// ── Support ────────────────────────────────────────────────
+document.getElementById('support-filter').addEventListener('change', () => { pages.support = 1; loadSupport(); });
+
+async function loadSupport() {
+  const status = document.getElementById('support-filter').value;
+  const qs = `?page=${pages.support}&limit=20${status ? `&status=${status}` : ''}`;
+  const data = await apiFetch(`/support${qs}`);
+  if (!data) return;
+
+  const body = data.messages.length
+    ? `<table>
+        <thead><tr><th>Email / PSID</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody>${data.messages.map(m => `
+          <tr>
+            <td>${m.email || m.psid}</td>
+            <td style="max-width:200px;word-break:break-word;font-size:.75rem">${esc(m.message)}</td>
+            <td>${supportBadge(m.status)}</td>
+            <td style="color:var(--muted);font-size:.75rem">${fmtDate(m.createdAt)}</td>
+            <td style="font-size:.75rem">
+              ${m.status !== 'CLOSED' ? `<button onclick="updateSupport('${m._id}','CLOSED')"
+                style="background:var(--surface2);border:1px solid var(--border);color:var(--text);
+                       padding:3px 8px;border-radius:5px;cursor:pointer;font-size:.7rem;margin-bottom:2px;width:100%">Close</button>` : ''}
+              ${m.status === 'OPEN' ? `<button onclick="updateSupport('${m._id}','IN_PROGRESS')"
+                style="background:rgba(245,158,11,.15);border:1px solid var(--yellow);color:var(--yellow);
+                       padding:3px 8px;border-radius:5px;cursor:pointer;font-size:.7rem;width:100%">In Progress</button>` : ''}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+       </table>`
+    : '<div class="loading">No tickets</div>';
+
+  document.getElementById('support-table-body').innerHTML = body;
+  renderPagination('support-pagination', pages.support, data.pages, (p) => { pages.support = p; loadSupport(); });
+}
+
+async function updateSupport(id, status) {
+  await apiFetch(`/support/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  loadSupport();
+}
+
+// ── Activity ───────────────────────────────────────────────
+async function loadActivity() {
+  const data = await apiFetch('/activity');
+  if (!data) return;
+
+  document.getElementById('activity-list').innerHTML = data.length
+    ? data.map(a => `
+        <div class="activity-item">
+          <div class="activity-dot ${a.type}"></div>
+          <div>
+            <div class="activity-label">${esc(a.label)}</div>
+            <div class="activity-meta">${a.user} · ${fmtDate(a.date)}</div>
+          </div>
+        </div>`).join('')
+    : '<div class="loading">No activity</div>';
+}
+
+// ── Top-ups ────────────────────────────────────────────────
+document.getElementById('topup-filter').addEventListener('change', () => { pages.topups = 1; loadTopups(); });
+
+async function loadTopups() {
+  const status = document.getElementById('topup-filter').value;
+  const qs = `?page=${pages.topups}&limit=20${status ? `&status=${encodeURIComponent(status)}` : ''}`;
+  const data = await apiFetch(`/topups${qs}`);
+  if (!data) return;
+  const body = data.topups.length
+    ? `<table><thead><tr><th>Email</th><th>Amount</th><th>Balance</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>
+       ${data.topups.map(t => `<tr>
+        <td>${esc(t.userId?.email || t.email || t.psid)}</td>
+        <td><strong style="color:var(--green)">$${(+t.amount).toFixed(2)}</strong></td>
+        <td>$${(+(t.userId?.balance || 0)).toFixed(2)}</td>
+        <td>${topupBadge(t.status)}</td>
+        <td style="color:var(--muted);font-size:.75rem">${fmtDate(t.createdAt)}</td>
+        <td style="font-size:.75rem">${t.status === 'PENDING'
+          ? `<button onclick="processTopup('${t._id}','APPROVED')" style="background:rgba(16,185,129,.15);border:1px solid var(--green);color:var(--green);padding:3px 6px;border-radius:5px;cursor:pointer;font-size:.65rem;margin-right:2px;font-weight:600;width:100%;margin-bottom:2px">✅ Approve</button>
+             <button onclick="processTopup('${t._id}','REJECTED')" style="background:rgba(239,68,68,.1);border:1px solid var(--red);color:var(--red);padding:3px 6px;border-radius:5px;cursor:pointer;font-size:.65rem;font-weight:600;width:100%">❌ Reject</button>`
+          : '<span style="color:var(--muted);font-size:.75rem">—</span>'}</td>
+       </tr>`).join('')}
+       </tbody></table>`
+    : '<div class="loading">No requests</div>';
+  document.getElementById('topups-table-body').innerHTML = body;
+  renderPagination('topups-pagination', pages.topups, data.pages, (p) => { pages.topups = p; loadTopups(); });
+}
+
+async function processTopup(id, status) {
+  if (!confirm(`${status === 'APPROVED' ? '✅ Approve' : '❌ Reject'} this top-up?`)) return;
+  const result = await apiFetch(`/topups/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  if (result) { loadTopups(); loadStats(); }
+}
+
+function topupBadge(s) {
+  const m = { PENDING: 'yellow', APPROVED: 'green', REJECTED: 'red' };
+  const l = { PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected' };
+  return `<span class="badge ${m[s]||'gray'}">${l[s]||s}</span>`;
+}
+
+async function apiFetch(path, opts = {}) {
+  try {
+    const res = await fetch(API(path), { headers: headers(), ...opts });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  } catch (err) {
+    console.error('API error:', err);
+    return null;
+  }
+}
+
+function renderPagination(containerId, current, total, onPage) {
+  const c = document.getElementById(containerId);
+  if (total <= 1) { c.innerHTML = ''; return; }
+  c.innerHTML = `
+    <button ${current <= 1 ? 'disabled' : ''} onclick="(${onPage.toString()})(${current - 1})">← Prev</button>
+    <span class="info">Page ${current} / ${total}</span>
+    <button ${current >= total ? 'disabled' : ''} onclick="(${onPage.toString()})(${current + 1})">Next →</button>
+  `;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-US', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+function statusBadge(s) {
+  const map = { ACTIVE: 'green', EXPIRED: 'red', SUSPENDED: 'yellow' };
+  return `<span class="badge ${map[s] || 'gray'}">${s}</span>`;
+}
+function supportBadge(s) {
+  const map = { OPEN: 'blue', IN_PROGRESS: 'yellow', CLOSED: 'gray' };
+  const labels = { OPEN: 'Open', IN_PROGRESS: 'In Progress', CLOSED: 'Closed' };
+  return `<span class="badge ${map[s] || 'gray'}">${labels[s] || s}</span>`;
+}
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
