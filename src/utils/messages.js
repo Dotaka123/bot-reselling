@@ -58,7 +58,7 @@ This helps us stay connected with our community.
 `❌ Verification Failed
 
 Please make sure you have subscribed to our Facebook page.
-Visit: https://facebook.com/proxybotservice
+Visit: https://www.facebook.com/profile.php?id=61552396135882
 
 Then type "done" to try again.`,
 

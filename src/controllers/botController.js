@@ -22,7 +22,7 @@ const TopUpRequest      = require('../models/TopUpRequest');
  */
 
 const PAGE = M.PAGE_SIZE;
-const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://facebook.com/proxybotservice';
+const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://www.facebook.com/profile.php?id=61552396135882';
 
 // ── Captcha generator ────────────────────────────────────────
 function generateCaptcha() {
@@ -158,55 +158,21 @@ async function handleMessage(psid, messageText) {
 //  WELCOME / FACEBOOK VERIFICATION / CAPTCHA / LOGIN / REGISTER
 // ═══════════════════════════════════════════════════════════════
 
-async function handleWelcome(user, psid, input) {
-  // Send welcome message and ask to verify Facebook subscription
+async function handleWelcome(user, psid) {
+  // Send welcome message and ask user to type done.
   await sendText(psid, M.FACEBOOK_VERIFICATION_PENDING);
   await userService.setState(user, 'FB_VERIFICATION', { step: 1 });
 }
 
-// ── Facebook Verification ─────────────────────────────────────
-const facebookVerificationService = require('../services/facebookVerificationService');
-
 async function handleFBVerification(user, psid, input) {
-  // Check if user typed "done"
-  if (input.type === 'command' && input.value === 'DONE') {
-    
-    // Try to verify subscription
-    let isSubscribed = false;
-    
-    try {
-      console.log(`🔍 Verifying subscription for PSID: ${psid}`);
-      
-      // Method 1: Check via Facebook API
-      if (process.env.FACEBOOK_VERIFICATION_MODE === 'api') {
-        isSubscribed = await facebookVerificationService.verifyFacebookPageSubscription(psid);
-      }
-      // Method 2: Check via Database (webhook-based)
-      else if (process.env.FACEBOOK_VERIFICATION_MODE === 'webhook') {
-        isSubscribed = await facebookVerificationService.verifySubscriptionFromDatabase(user._id);
-      }
-      
-      if (!isSubscribed) {
-        // Verification failed
-        await sendText(psid, M.FACEBOOK_VERIFICATION_ERROR);
-        await sendText(psid, `📱 Please make sure you:\n1. Subscribed to our page\n2. Waited 30 seconds\n3. Then type "done" again\n\nPage: ${process.env.FACEBOOK_PAGE_URL}`);
-        return;
-      }
-      
-      // Verification successful!
-      console.log(`✅ Subscription verified for ${psid}`);
-      await sendText(psid, '✅ Facebook verification complete!');
-      await user.updateOne({ isPageSubscriber: true });
-      
-      // Move to login/register
-      await userService.setState(user, 'WELCOME');
-      await sendText(psid, M.WELCOME(user.facebookName || 'friend'));
-      
-    } catch (error) {
-      console.error('❌ Verification error:', error);
-      await sendText(psid, '❌ Verification failed. Please try again.');
-    }
-    
+  const normalizedText = input.type === 'text' ? input.value.trim().toLowerCase() : '';
+
+  // Accept both parsed command and raw text fallback.
+  if ((input.type === 'command' && input.value === 'DONE') || normalizedText === 'done') {
+    await sendText(psid, '✅ Done received! Access granted.');
+    await user.updateOne({ isPageSubscriber: true });
+    await userService.setState(user, 'WELCOME');
+    await sendText(psid, M.WELCOME(user.facebookName || 'friend'));
     return;
   }
 
@@ -216,9 +182,8 @@ async function handleFBVerification(user, psid, input) {
     return;
   }
 
-  // User didn't type "done"
   await sendText(psid, M.FACEBOOK_VERIFICATION_ERROR);
-  await sendText(psid, `Visit: ${process.env.FACEBOOK_PAGE_URL}`);
+  await sendText(psid, `Visit: ${FACEBOOK_PAGE_URL}`);
   await sendText(psid, M.FACEBOOK_VERIFICATION_PENDING);
 }
 
