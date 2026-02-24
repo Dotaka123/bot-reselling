@@ -25,7 +25,12 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'ProxyBot Messenger', time: new Date().toISOString() });
 });
 
-// Serve admin panel at /admin
+// Root landing page
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Admin panel
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
