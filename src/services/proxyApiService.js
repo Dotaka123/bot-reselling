@@ -6,8 +6,9 @@
  * All calls use a single master account (env vars).
  */
 const axios = require('axios');
+const qs    = require('querystring');
 
-const BASE     = process.env.PROXY_API_URL;
+const BASE     = process.env.PROXY_API_URL || 'https://bot.mega-panel.net/api/web/index.php/v1';
 const EMAIL    = process.env.PROXY_API_EMAIL    || 'mdraselphd6@gmail.com';
 const PASSWORD = process.env.PROXY_API_PASSWORD || '@phdidea6';
 
@@ -21,16 +22,34 @@ async function getToken() {
     // Refresh 2 minutes before expiry (token lasts 60 min)
     if (_token && _tokenExpiry > now + 120) return _token;
 
-    if (!BASE) throw new Error('PROXY_API_URL is not set in environment variables');
+    console.log(`🔐 Logging in to proxy API: ${BASE}/login as ${EMAIL}`);
 
-    const res = await axios.post(
-        `${BASE}/login`,
-        { email: EMAIL, password: PASSWORD },
-        { timeout: 10000 }
-    );
+    let res;
+    try {
+        // Try JSON first (as documented)
+        res = await axios.post(
+            `${BASE}/login`,
+            { email: EMAIL, password: PASSWORD },
+            { timeout: 10000, headers: { 'Content-Type': 'application/json' } }
+        );
+    } catch (jsonErr) {
+        // Fallback: some Yii2 APIs require form-urlencoded
+        console.warn('⚠️  JSON login failed, retrying with form-urlencoded...');
+        console.warn('   Error:', jsonErr.response?.status, JSON.stringify(jsonErr.response?.data));
+        res = await axios.post(
+            `${BASE}/login`,
+            qs.stringify({ email: EMAIL, password: PASSWORD }),
+            { timeout: 10000, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+    }
+
+    if (!res.data?.token) {
+        console.error('❌ Login response has no token:', JSON.stringify(res.data));
+        throw new Error(`Login failed: ${JSON.stringify(res.data)}`);
+    }
 
     _token       = res.data.token;
-    _tokenExpiry = res.data.expire_at || (now + 3600); // expire_at is a unix timestamp
+    _tokenExpiry = res.data.expire_at || (now + 3600);
     console.log('🔑 Proxy API token refreshed (expires:', new Date(_tokenExpiry * 1000).toISOString(), ')');
     return _token;
 }
@@ -49,8 +68,12 @@ async function api(method, endpoint, data = null, params = null) {
     try {
         return (await axios(cfg)).data;
     } catch (err) {
+        const status  = err.response?.status;
+        const errBody = JSON.stringify(err.response?.data);
+        console.error(`❌ API ${method} ${endpoint} → ${status}:`, errBody);
+
         // Token expired mid-session — force refresh and retry once
-        if (err.response?.status === 401) {
+        if (status === 401) {
             _token = null;
             const newToken = await getToken();
             cfg.headers.Authorization = `Bearer ${newToken}`;
