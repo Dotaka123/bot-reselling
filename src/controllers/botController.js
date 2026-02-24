@@ -281,8 +281,9 @@ async function showMainMenu(psid) {
         `1️⃣  🛒 Buy a proxy\n` +
         `2️⃣  👤 My profile & balance\n` +
         `3️⃣  📦 My proxies\n` +
-        `4️⃣  💬 Support / Top-up\n` +
-        `5️⃣  🚪 Logout\n\n` +
+        `4️⃣  💰 Top-up balance\n` +
+        `5️⃣  💬 Contact support\n` +
+        `6️⃣  🚪 Logout\n\n` +
         `(0 = Back, 9 = Menu, CANCEL = Restart)`
     );
 }
@@ -316,7 +317,7 @@ async function handleMainMenu(user, psid, input) {
                 `👤 MY PROFILE\n\n` +
                 `📧 Email:   ${user.email}\n` +
                 `💳 Balance: $${(user.balance || 0).toFixed(2)}\n\n` +
-                `💡 To top up your balance, choose option 4.\n\n` +
+                `💡 To top up your balance, choose option 4 from the menu.\n\n` +
                 `(9 = Menu)`
             );
         }
@@ -342,20 +343,17 @@ async function handleMainMenu(user, psid, input) {
         }
 
         case 4:
+            return await handleTopUpStart(user, psid);
+
+        case 5:
             await userService.setState(user, 'SUPPORT');
             return await sendText(psid,
-                `💬 SUPPORT & TOP-UP\n\n` +
-                `📲 To top up your balance, send your payment:\n` +
-                `🔸 Binance ID: 909914646\n` +
-                `🔸 Bkash: 01567906551\n` +
-                `🔸 Nagad: 01567906551\n\n` +
-                `Then type your message below with the amount paid\n` +
-                `and your transaction ID. Admin will credit you.\n\n` +
-                `Or just describe your issue:\n\n` +
+                `💬 CONTACT SUPPORT\n\n` +
+                `Type your message below and our team will reply shortly.\n\n` +
                 `(0 = Back, 9 = Menu)`
             );
 
-        case 5:
+        case 6:
             user.isLoggedIn = false;
             await user.save();
             await userService.setState(user, 'WELCOME');
@@ -744,7 +742,7 @@ async function handleBuyCredentials(user, psid, input, rawMessage) {
         `💳 Balance:   $${(user.balance || 0).toFixed(2)}\n\n` +
         (hasBalance
             ? `1️⃣  ✅ CONFIRM & BUY\n0️⃣  ❌ Cancel`
-            : `❌ Insufficient balance!\nRequired: $${sd.price.toFixed(2)}\nYours: $${(user.balance || 0).toFixed(2)}\n\n3️⃣  💬 Contact support for top-up\n0️⃣  Cancel`)
+            : `❌ Insufficient balance!\nRequired: $${sd.price.toFixed(2)}\nYours: $${(user.balance || 0).toFixed(2)}\n\n4️⃣  💰 Top-up balance\n5️⃣  💬 Contact support\n0️⃣  Cancel`)
     );
 }
 
@@ -753,10 +751,13 @@ async function handleBuyCredentials(user, psid, input, rawMessage) {
 async function handleBuyConfirm(user, psid, input) {
     if (input.type !== 'number') return await sendText(psid, '❌ Type 1 to confirm or 0 to cancel');
     if (input.value === 0) { await userService.setState(user, 'MAIN_MENU'); return await showMainMenu(psid); }
-    if (input.value === 3) {
+    if (input.value === 4) {
+        return await handleTopUpStart(user, psid);
+    }
+    if (input.value === 5) {
         await userService.setState(user, 'SUPPORT');
         return await sendText(psid,
-            `💬 SUPPORT\n\nType your message to request a top-up.\nInclude the amount and your payment proof.\n\n(0 = Back)`
+            `💬 CONTACT SUPPORT\n\nType your message and our team will reply shortly.\n\n(0 = Back)`
         );
     }
     if (input.value !== 1) return await sendText(psid, '❌ Type 1 to confirm or 0 to cancel');
@@ -767,7 +768,7 @@ async function handleBuyConfirm(user, psid, input) {
     const deducted = await userService.deductBalance(user, sd.price);
     if (!deducted) {
         return await sendText(psid,
-            `❌ Insufficient balance!\nRequired: $${sd.price.toFixed(2)}\nYours: $${(user.balance || 0).toFixed(2)}\n\n3️⃣  💬 Contact support\n0️⃣  Cancel`
+            `❌ Insufficient balance!\nRequired: $${sd.price.toFixed(2)}\nYours: $${(user.balance || 0).toFixed(2)}\n\n4️⃣  💰 Top-up balance\n5️⃣  💬 Contact support\n0️⃣  Cancel`
         );
     }
 
@@ -833,7 +834,50 @@ async function handleBuyConfirm(user, psid, input) {
     }
 }
 
-// ── SUPPORT / TOP-UP ──────────────────────────────────────────────────────────
+// ── TOP-UP ────────────────────────────────────────────────────────────────────
+
+async function handleTopUpStart(user, psid) {
+    const paymentInfo = process.env.PAYMENT_INFO ||
+        'Choose payment method:\n'
+        + '💳 Binance - Recharge ID: 909914646\n'
+        + '💳 Bkash - Recharge Number: 01567906551\n'
+        + '💳 Nogod - Recharge Number: 01567906551\n'
+        + '💳 Rocket - Recharge Number: 01567906551';
+
+    await userService.setState(user, 'TOPUP');
+    return await sendText(psid,
+        `💰 TOP-UP BALANCE\n\n` +
+        `${paymentInfo}\n\n` +
+        `──────────────────────\n` +
+        `After sending the payment, reply here with:\n` +
+        `• Amount paid\n` +
+        `• Transaction ID / reference\n\n` +
+        `Your balance will be credited by an admin.\n\n` +
+        `(0 = Back, 9 = Menu)`
+    );
+}
+
+async function handleTopUp(user, psid, input, rawMessage) {
+    if (input.type === 'number' && input.value === 0) {
+        await userService.setState(user, 'MAIN_MENU');
+        return await showMainMenu(psid);
+    }
+    const msg = (rawMessage || '').trim();
+    if (msg.length < 3) return await sendText(psid, '❌ Message too short. Please include the amount and transaction ID.\n\n(0 = Back)');
+    try {
+        await TopUpRequest.create({ userId: user._id, psid, email: user.email, amount: 0, notes: msg });
+        await sendText(psid,
+            `✅ TOP-UP REQUEST SENT!\n\n` +
+            `👨‍💼 An admin will verify your payment and credit your balance shortly.\n\n` +
+            `(9 = Menu)`
+        );
+        await userService.setState(user, 'MAIN_MENU');
+    } catch {
+        await sendText(psid, '❌ Error sending request. Please try again.');
+    }
+}
+
+// ── SUPPORT ───────────────────────────────────────────────────────────────────
 
 async function handleSupport(user, psid, input, rawMessage) {
     if (input.type === 'number' && input.value === 0) {
@@ -849,24 +893,6 @@ async function handleSupport(user, psid, input, rawMessage) {
     } catch {
         await sendText(psid, '❌ Error sending message. Please try again.');
     }
-}
-
-// ── TOPUP (kept for compatibility) ────────────────────────────────────────────
-
-async function handleTopUp(user, psid, input, rawMessage) {
-    if (input.type === 'number' && input.value === 0) {
-        await userService.setState(user, 'MAIN_MENU');
-        return await showMainMenu(psid);
-    }
-    // Redirect to support for top-up requests
-    await userService.setState(user, 'SUPPORT');
-    return await sendText(psid,
-        `💬 TOP-UP REQUEST\n\n` +
-        `📲 Send your payment first:\n` +
-        `🔸 Binance ID: 909914646\n🔸 Bkash: 01567906551\n\n` +
-        `Then type your message including:\n` +
-        `• Amount paid\n• Transaction ID / screenshot reference\n\n(0 = Back)`
-    );
 }
 
 module.exports = { handleMessage };
