@@ -28,29 +28,26 @@ async function createUser(psid) {
     }
 }
 
-async function createUserWithCredentials(psid, email, passwordHash) {
+// BUG FIX: Instead of inserting a new user (duplicate PSID crash),
+// we UPDATE the existing user record with credentials.
+async function setUserCredentials(user, email, passwordHash) {
     try {
-        const user = new User({
-            psid,
-            email,
-            passwordHash,
-            isLoggedIn: true,
-            isPageSubscriber: false,
-            state: 'MAIN_MENU',
-            stateData: {},
-            balance: 0
-        });
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.isLoggedIn = true;
+        user.state = 'MAIN_MENU';
+        user.stateData = {};
         await user.save();
         return user;
     } catch (err) {
-        console.error('Error creating user with credentials:', err);
+        console.error('Error setting user credentials:', err);
         return null;
     }
 }
 
 async function getUserByEmail(email) {
     try {
-        return await User.findOne({ email });
+        return await User.findOne({ email: email.toLowerCase().trim() });
     } catch (err) {
         console.error('Error getting user by email:', err);
         return null;
@@ -73,7 +70,6 @@ async function getActiveProxies(userId) {
     try {
         return await Proxy.find({ userId, status: 'ACTIVE' });
     } catch (err) {
-        console.error('Error getting active proxies:', err);
         return [];
     }
 }
@@ -82,7 +78,6 @@ async function getExpiredProxies(userId) {
     try {
         return await Proxy.find({ userId, status: 'EXPIRED' });
     } catch (err) {
-        console.error('Error getting expired proxies:', err);
         return [];
     }
 }
@@ -121,10 +116,8 @@ async function getUserProfile(userId) {
     try {
         const user = await User.findById(userId);
         if (!user) return null;
-        
         const activeProxies = await getActiveProxies(userId);
         const expiredProxies = await getExpiredProxies(userId);
-        
         return { user, activeProxies, expiredProxies };
     } catch (err) {
         console.error('Error getting user profile:', err);
@@ -133,6 +126,6 @@ async function getUserProfile(userId) {
 }
 
 module.exports = {
-    getUserByPsid, createUser, createUserWithCredentials, getUserByEmail,
+    getUserByPsid, createUser, setUserCredentials, getUserByEmail,
     setState, getActiveProxies, getExpiredProxies, addBalance, deductBalance, getUserProfile
 };

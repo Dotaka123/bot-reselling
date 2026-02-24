@@ -10,11 +10,11 @@ router.get('/', (req, res) => {
     const challenge = req.query['hub.challenge'];
 
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        console.log('✅ Webhook Facebook vérifié!');
+        console.log('✅ Facebook webhook verified!');
         return res.status(200).send(challenge);
     }
 
-    console.error('❌ Échec de vérification webhook');
+    console.error('❌ Webhook verification failed');
     res.sendStatus(403);
 });
 
@@ -60,7 +60,7 @@ function verifySignature(req, res, next) {
     const expected = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(payload).digest('hex');
 
     if (signature !== expected) {
-        console.error('❌ Signature invalide');
+        console.error('❌ Invalid webhook signature');
         return res.sendStatus(403);
     }
 

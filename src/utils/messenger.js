@@ -4,7 +4,7 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 
 async function sendText(psid, text) {
     if (!PAGE_ACCESS_TOKEN) {
-        console.warn('⚠️ PAGE_ACCESS_TOKEN non configuré');
+        console.warn('⚠️ PAGE_ACCESS_TOKEN is not configured');
         return false;
     }
 
@@ -29,7 +29,7 @@ async function getUserName(psid) {
             params: { fields: 'first_name,last_name', access_token: PAGE_ACCESS_TOKEN }
         });
         return res.data.first_name || 'User';
-    } catch (err) {
+    } catch {
         return 'User';
     }
 }
