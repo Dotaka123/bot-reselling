@@ -13,8 +13,12 @@ const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://www.facebook
 // Format: { packageId: { 'label from API': price_in_USD } }
 // Labels used by the reseller API (French): '2 heures', '12 heures', '1 jour',
 //   '2 jours', '3 jours', '7 jours', '15 jours', '30 jours'
+// Package IDs from env (must match proxyApiService.js)
+const GOLDEN_PKG_ID = String(process.env.GOLDEN_PACKAGE_ID || '1');
+const SILVER_PKG_ID = String(process.env.SILVER_PACKAGE_ID || '2');
+
 const CUSTOM_PRICES = {
-    '1': { // Golden Package — matched against normalizePrice() label output
+    [GOLDEN_PKG_ID]: { // Golden Package
         '2 hours':  0.25,
         '3 hours':  0.30,
         '12 hours': 0.45,
@@ -24,7 +28,7 @@ const CUSTOM_PRICES = {
         '15 days':  7.50,
         '30 days':  14.50,
     },
-    '2': { // Silver Package
+    [SILVER_PKG_ID]: { // Silver Package
         '2 days':   1.10,
         '7 days':   3.00,
         '30 days':  10.00,
@@ -311,9 +315,11 @@ async function handleMainMenu(user, psid, input) {
                 // Load prices via the SINGLE reseller token (not user's)
                 const rawPrices = await proxyApi.getPrices();
                 const prices = applyCustomPrices(rawPrices);
+                const GOLDEN_ID = String(process.env.GOLDEN_PACKAGE_ID || '1');
+                const SILVER_ID  = String(process.env.SILVER_PACKAGE_ID  || '2');
                 const packages = Object.keys(prices).map(pkgId => ({
                     id:   pkgId,
-                    name: pkgId === '1' ? '🥇 Golden (Mobile)' : pkgId === '2' ? '🥈 Silver (Mobile)' : `Package ${pkgId}`
+                    name: pkgId === GOLDEN_ID ? '🥇 Golden (Mobile)' : pkgId === SILVER_ID ? '🥈 Silver (Mobile)' : `Package ${pkgId}`
                 }));
                 await userService.setState(user, 'BUY_PKG', { prices, packages });
                 let msg = `📦 BUY A PROXY — Step 1\n\n🎯 Choose a PACKAGE:\n\n`;
