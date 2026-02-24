@@ -92,12 +92,12 @@ async function handleMessage(psid, messageText) {
                 case 'REG_PASSWORD':      return await handleRegPassword(user, psid, input, messageText);
                 case 'MAIN_MENU':         return await handleMainMenu(user, psid, input);
                 case 'BUY_PKG':           return await handleBuyPkg(user, psid, input);
+                case 'BUY_PROTO':         return await handleBuyProto(user, psid, input);   // step 2 — right after package
                 case 'BUY_DURATION':      return await handleBuyDuration(user, psid, input);
                 case 'BUY_COUNTRY':       return await handleBuyCountry(user, psid, input);
                 case 'BUY_CITY':          return await handleBuyCity(user, psid, input);
                 case 'BUY_PROVIDER':      return await handleBuyProvider(user, psid, input);
                 case 'BUY_PARENT':        return await handleBuyParent(user, psid, input);
-                case 'BUY_PROTO':         return await handleBuyProto(user, psid, input);
                 case 'BUY_CREDENTIALS':   return await handleBuyCredentials(user, psid, input, messageText);
                 case 'BUY_CONFIRM':       return await handleBuyConfirm(user, psid, input);
                 case 'TOPUP':             return await handleTopUp(user, psid, input, messageText);
@@ -339,41 +339,46 @@ async function handleBuyPkg(user, psid, input) {
 
     const pkg = packages[idx];
     const pkgPrices = prices[pkg.id];
+    if (!pkgPrices || pkgPrices.length === 0) return await sendText(psid, '❌ No prices available for this package.');
 
-    await userService.setState(user, 'BUY_DURATION', { prices, packages, pkgId: pkg.id, pkgName: pkg.name, pkgPrices });
-    let msg = `⏱️ BUY A PROXY — Step 2\n\n🎯 Choose a DURATION:\n\n`;
-    pkgPrices.forEach((p, i) => msg += `${i + 1}️⃣  ${p.label.padEnd(12)} - $${p.price.toFixed(2)}\n`);
-    msg += `\n(0 = Back, 9 = Menu)`;
-    return await sendText(psid, msg);
+    // ── Step 2: protocol BEFORE duration/geography
+    await userService.setState(user, 'BUY_PROTO', { prices, packages, pkgId: pkg.id, pkgName: pkg.name, pkgPrices });
+    return await sendText(psid,
+        `📡 BUY A PROXY — Step 2\n\n🎯 Choose a PROTOCOL:\n\n1️⃣  HTTP / HTTPS\n2️⃣  SOCKS5\n\n(0 = Back, 9 = Menu)`
+    );
 }
 
 async function handleBuyDuration(user, psid, input) {
     if (input.type !== 'number') return await sendText(psid, '❌ Type a number');
+
+    // Back = return to protocol selection
     if (input.value === 0) {
-        const { packages, prices } = user.stateData;
-        await userService.setState(user, 'BUY_PKG', { packages, prices });
-        let msg = `📦 Choose a PACKAGE:\n\n`;
-        packages.forEach((p, i) => msg += `${i + 1}️⃣  ${p.name}\n`);
-        msg += `\n(0 = Back)`;
-        return await sendText(psid, msg);
+        await userService.setState(user, 'BUY_PROTO', { ...user.stateData, countries: undefined, countryPage: undefined });
+        return await sendText(psid,
+            `📡 Choose a PROTOCOL:\n\n1️⃣  HTTP / HTTPS\n2️⃣  SOCKS5\n\n(0 = Back)`
+        );
     }
+
     const { pkgPrices } = user.stateData;
     const idx = input.value - 1;
     if (idx < 0 || idx >= pkgPrices.length) return await sendText(psid, `❌ Invalid. Type 1–${pkgPrices.length}:`);
 
     const priceObj = pkgPrices[idx];
+    if (typeof priceObj.price !== 'number') return await sendText(psid, '❌ Invalid price data. Please try again.');
+
     try {
-        // RESELLER TOKEN used here — not the user's token
         const countries = await proxyApi.getCountries(user.stateData.pkgId);
         if (!countries || countries.length === 0) return await sendText(psid, '❌ No countries available.');
         const tp = totalPages(countries);
         await userService.setState(user, 'BUY_COUNTRY', {
             ...user.stateData,
-            duration: priceObj.duration, price: priceObj.price, durationLabel: priceObj.label,
+            duration: priceObj.duration,
+            price: priceObj.price,
+            durationLabel: formatDurationLabel(priceObj),
             countries, countryPage: 1
         });
         const pageC = getPage(countries, 1);
-        let msg = `🌍 BUY A PROXY — Step 3\n\n🎯 Choose a COUNTRY (Page 1/${tp}):\n\n`;
+        let msg = `🌍 BUY A PROXY — Step 4\n\n🎯 Choose a COUNTRY (Page 1/${tp}):\n\n`;
         pageC.forEach((c, i) => msg += `${i + 1}️⃣  ${c.country_name}\n`);
         if (tp > 1) msg += `\n9️⃣  ➡️  Next page`;
         msg += `\n0️⃣  Back`;
@@ -435,7 +440,7 @@ async function handleBuyCountry(user, psid, input) {
                     countryPage: page, cities, cityPage: 1
                 });
                 const pageC = getPage(cities, 1);
-                let msg = `🏙️ BUY A PROXY — Step 4\n\n🎯 Choose a CITY (Page 1/${tp}):\n\n`;
+                let msg = `🏙️ BUY A PROXY — Step 5\n\n🎯 Choose a CITY (Page 1/${tp}):\n\n`;
                 pageC.forEach((c, i) => msg += `${i + 1}️⃣  ${c.city_name}\n`);
                 if (tp > 1) msg += `\n9️⃣  ➡️  Next page`;
                 msg += `\n0️⃣  Back`;
@@ -449,7 +454,11 @@ async function handleBuyCountry(user, psid, input) {
             const { pkgPrices } = user.stateData;
             await userService.setState(user, 'BUY_DURATION', { ...user.stateData, countries: undefined, countryPage: undefined });
             let msg = `⏱️ Choose a DURATION:\n\n`;
-            pkgPrices.forEach((p, i) => msg += `${i + 1}️⃣  ${p.label} - $${p.price.toFixed(2)}\n`);
+            pkgPrices.forEach((p, i) => {
+                const label = formatDurationLabel(p);
+                const price = (typeof p.price === 'number') ? p.price.toFixed(2) : '?';
+                msg += `${i + 1}️⃣  ${label.padEnd(12)} - $${price}\n`;
+            });
             msg += `\n(0 = Back)`;
             return await sendText(psid, msg);
         }
@@ -474,7 +483,7 @@ async function handleBuyCity(user, psid, input) {
                     cityPage: page, providers, providerPage: 1
                 });
                 const pageP = getPage(providers, 1);
-                let msg = `📡 BUY A PROXY — Step 5\n\n🎯 Choose a PROVIDER (Page 1/${tp}):\n\n`;
+                let msg = `📡 BUY A PROXY — Step 6\n\n🎯 Choose a PROVIDER (Page 1/${tp}):\n\n`;
                 pageP.forEach((p, i) => msg += `${i + 1}️⃣  ${p.service_provider_name}\n`);
                 if (tp > 1) msg += `\n9️⃣  ➡️  Next page`;
                 msg += `\n0️⃣  Back`;
@@ -519,10 +528,9 @@ async function handleBuyProvider(user, psid, input) {
                     providerPage: page, parents, parentPage: 1
                 });
                 const pageP = getPage(parents, 1);
-                let msg = `🖥️ BUY A PROXY — Step 6\n\n🎯 Choose a NODE (Page 1/${tp}):\n\n`;
+                let msg = `🖥️ BUY A PROXY — Step 7\n\n🎯 Choose a NODE (Page 1/${tp}):\n\n`;
                 pageP.forEach((p, i) => {
-                    const usage = p.usage === -1 ? 'N/A' : `${p.usage}%`;
-                    msg += `${i + 1}️⃣  ${p.technology} | Usage: ${usage} | Rotation: ${p.rotation_time}min\n`;
+                    msg += `${i + 1}️⃣  ${formatParentLabel(p)}\n`;
                 });
                 if (tp > 1) msg += `\n9️⃣  ➡️  Next page`;
                 msg += `\n0️⃣  Back`;
@@ -553,15 +561,31 @@ async function handleBuyParent(user, psid, input) {
     return await paginatedStep(user, psid, input, {
         stateKey: 'BUY_PARENT', pageKey: 'parentPage',
         items: user.stateData.parents || [],
-        labelFn: p => `${p.technology} | Usage: ${p.usage === -1 ? 'N/A' : p.usage + '%'} | Rotation: ${p.rotation_time}min`,
+        labelFn: formatParentLabel,   // null-safe helper
         stepTitle: '🖥️ Nodes',
         onSelect: async (parent, page) => {
-            await userService.setState(user, 'BUY_PROTO', {
-                ...user.stateData,
-                parentId: parent.id, parentTech: parent.technology,
-                httpPort: parent.http_port, socksPort: parent.socks_port, parentPage: page
+            // Protocol was already chosen at step 2 — go straight to credentials
+            const sd = user.stateData;
+            const port = sd.protocol === 'socks5'
+                ? (parent.socks_port || parent.http_port || '?')
+                : (parent.http_port  || '?');
+
+            await userService.setState(user, 'BUY_CREDENTIALS', {
+                ...sd,
+                parentId: parent.id,
+                parentTech: parent.technology || 'N/A',
+                httpPort: parent.http_port, socksPort: parent.socks_port,
+                parentPort: port, parentPage: page
             });
-            await sendText(psid, `📡 BUY A PROXY — Step 7\n\n🎯 Choose a PROTOCOL:\n\n1️⃣  HTTP\n2️⃣  SOCKS5\n\n(0 = Back, 9 = Menu)`);
+            await sendText(psid,
+                `🔐 BUY A PROXY — Step 7\n\n` +
+                `Set YOUR PROXY credentials:\n\n` +
+                `📝 Format: username password\n` +
+                `   Example: myuser mypass123\n\n` +
+                `⚠️ Rules: lowercase letters, digits, _ and - only\n` +
+                `   Min 3 characters each\n\n` +
+                `(0 = Back)`
+            );
         },
         onBack: async () => {
             const providers = user.stateData.providers || [];
@@ -579,45 +603,75 @@ async function handleBuyParent(user, psid, input) {
 }
 
 // ── BUY PROTO ─────────────────────────────────────────────────────────────────
+// Now step 2: PKG → PROTO → DURATION → COUNTRY → ... → PARENT → CREDENTIALS
+
+function formatDurationLabel(p) {
+    // Translate French labels from reseller server + handle missing label
+    if (!p) return 'N/A';
+    if (p.label) {
+        const fr = { '2 heures': '2 hours', '12 heures': '12 hours', '1 jour': '1 day',
+                     '3 jours': '3 days', '7 jours': '7 days', '15 jours': '15 days',
+                     '30 jours': '30 days', '2 jours': '2 days', '2 days': '2 days',
+                     '1 day': '1 day', '7 days': '7 days', '30 days': '30 days' };
+        return fr[p.label] || p.label;
+    }
+    // Fallback: compute from duration float
+    if (p.duration < 1) return `${Math.round(p.duration * 100)}h`;
+    return `${p.duration} day${p.duration > 1 ? 's' : ''}`;
+}
+
+function formatParentLabel(p) {
+    const tech     = p.technology     || 'N/A';
+    const rotation = p.rotation_time  != null ? `${p.rotation_time}min` : 'N/A';
+    const usage    = p.usage === -1 || p.usage == null ? 'N/A' : `${p.usage}%`;
+    return `${tech} | Usage: ${usage} | Rotation: ${rotation}`;
+}
 
 async function handleBuyProto(user, psid, input) {
     if (input.type !== 'number') return await sendText(psid, '❌ Type 1 (HTTP) or 2 (SOCKS5)');
+
+    // Back = return to package selection
     if (input.value === 0) {
-        const parents = user.stateData.parents || [];
-        const parentPage = user.stateData.parentPage || 1;
-        await userService.setState(user, 'BUY_PARENT', { ...user.stateData, protocol: undefined });
-        const pageP = getPage(parents, parentPage);
-        const tp = totalPages(parents);
-        let msg = `🖥️ Nodes (Page ${parentPage}/${tp}):\n\n`;
-        pageP.forEach((p, i) => {
-            const usage = p.usage === -1 ? 'N/A' : `${p.usage}%`;
-            msg += `${i + 1}️⃣  ${p.technology} | Usage: ${usage} | Rotation: ${p.rotation_time}min\n`;
-        });
-        if (parentPage < tp) msg += `\n9️⃣  ➡️  Next page`;
-        msg += `\n0️⃣  Back`;
+        const { packages, prices } = user.stateData;
+        await userService.setState(user, 'BUY_PKG', { packages, prices });
+        let msg = `📦 Choose a PACKAGE:\n\n`;
+        packages.forEach((p, i) => msg += `${i + 1}️⃣  ${p.name}\n`);
+        msg += `\n(0 = Back)`;
         return await sendText(psid, msg);
     }
     if (![1, 2].includes(input.value)) return await sendText(psid, '❌ Type 1 (HTTP) or 2 (SOCKS5)');
 
     const protocol = input.value === 1 ? 'http' : 'socks5';
-    await userService.setState(user, 'BUY_CREDENTIALS', { ...user.stateData, protocol });
-    await sendText(psid,
-        `🔐 BUY A PROXY — Step 8\n\n` +
-        `Set YOUR PROXY credentials:\n\n` +
-        `📝 Format: username password\n` +
-        `   Example: myuser mypass123\n\n` +
-        `⚠️ Rules: lowercase letters, digits, _ and - only\n` +
-        `   Min 3 characters each\n\n` +
-        `(0 = Back)`
-    );
+
+    // Forward = show duration list (step 3)
+    const { pkgPrices } = user.stateData;
+    await userService.setState(user, 'BUY_DURATION', { ...user.stateData, protocol });
+
+    let msg = `⏱️ BUY A PROXY — Step 3\n\n🎯 Choose a DURATION:\n\n`;
+    pkgPrices.forEach((p, i) => {
+        const label = formatDurationLabel(p);
+        const price = (typeof p.price === 'number') ? p.price.toFixed(2) : '?';
+        msg += `${i + 1}️⃣  ${label.padEnd(12)} - $${price}\n`;
+    });
+    msg += `\n(0 = Back, 9 = Menu)`;
+    return await sendText(psid, msg);
 }
 
 // ── BUY CREDENTIALS ───────────────────────────────────────────────────────────
 
 async function handleBuyCredentials(user, psid, input, rawMessage) {
     if (input.type === 'number' && input.value === 0) {
-        await userService.setState(user, 'BUY_PROTO', { ...user.stateData, proxyUsername: undefined, proxyPassword: undefined });
-        return await sendText(psid, `📡 Protocol:\n\n1️⃣  HTTP\n2️⃣  SOCKS5\n\n(0 = Back)`);
+        // Back = return to node selection
+        const parents = user.stateData.parents || [];
+        const parentPage = user.stateData.parentPage || 1;
+        await userService.setState(user, 'BUY_PARENT', { ...user.stateData, proxyUsername: undefined, proxyPassword: undefined });
+        const pageP = getPage(parents, parentPage);
+        const tp = totalPages(parents);
+        let msg = `🖥️ Nodes (Page ${parentPage}/${tp}):\n\n`;
+        pageP.forEach((p, i) => msg += `${i + 1}️⃣  ${formatParentLabel(p)}\n`);
+        if (parentPage < tp) msg += `\n9️⃣  ➡️  Next page`;
+        msg += `\n0️⃣  Back`;
+        return await sendText(psid, msg);
     }
 
     const parts = (rawMessage || '').trim().split(/\s+/);
