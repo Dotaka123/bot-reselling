@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -265,13 +265,13 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
       <div class="dot">⚡</div>
       ProxyBot <span class="badge">ADMIN</span>
     </div>
-    <h2>Accès sécurisé</h2>
-    <p>Connectez-vous au panel administrateur</p>
+    <h2>Secure Access</h2>
+    <p>Sign in to the admin panel</p>
     <div class="form-group">
-      <label>Mot de passe</label>
+      <label>Password</label>
       <input class="form-input" type="password" id="pwdInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-    <button class="btn-login" onclick="doLogin()">Se connecter →</button>
+    <button class="btn-login" onclick="doLogin()">Sign in →</button>
     <div class="login-error" id="loginErr"></div>
   </div>
 </div>
@@ -284,7 +284,7 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
     <div class="topbar-spacer"></div>
     <div class="topbar-info" id="topbarTime"></div>
     <button class="btn-sm" onclick="refreshCurrentPage()">↻ Refresh</button>
-    <button class="btn-sm" onclick="doLogout()">Déconnexion</button>
+    <button class="btn-sm" onclick="doLogout()">Logout</button>
   </div>
 
   <div class="body-wrap">
@@ -295,7 +295,7 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <span class="icon">📊</span><span>Dashboard</span>
       </button>
       <button class="nav-item" onclick="nav('users')" id="nav-users">
-        <span class="icon">👥</span><span>Utilisateurs</span>
+        <span class="icon">👥</span><span>Users</span>
       </button>
       <button class="nav-item" onclick="nav('topups')" id="nav-topups">
         <span class="icon">💰</span><span>Top-up</span>
@@ -306,7 +306,7 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <span class="icon">💬</span><span>Messages</span>
         <span class="nav-badge" id="badge-support">0</span>
       </button>
-      <div class="nav-section">Données</div>
+      <div class="nav-section">Data</div>
       <button class="nav-item" onclick="nav('proxies')" id="nav-proxies">
         <span class="icon">🌐</span><span>Proxies</span>
       </button>
@@ -320,7 +320,7 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <div class="page-header">
           <div>
             <div class="page-title">Dashboard</div>
-            <div class="page-sub">Vue d'ensemble en temps réel</div>
+            <div class="page-sub">Real-time overview</div>
           </div>
         </div>
         <div class="stats-grid" id="statsGrid">
@@ -328,12 +328,12 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         </div>
         <div class="grid2">
           <div class="card">
-            <div class="card-header"><span class="card-title">👤 Derniers utilisateurs</span></div>
-            <div class="table-wrap"><table id="recentUsersTable"><tr><td class="loader">Chargement…</td></tr></table></div>
+            <div class="card-header"><span class="card-title">👤 Latest users</span></div>
+            <div class="table-wrap"><table id="recentUsersTable"><tr><td class="loader">Loading…</td></tr></table></div>
           </div>
           <div class="card">
-            <div class="card-header"><span class="card-title">🌐 Derniers proxies</span></div>
-            <div class="table-wrap"><table id="recentProxiesTable"><tr><td class="loader">Chargement…</td></tr></table></div>
+            <div class="card-header"><span class="card-title">🌐 Latest proxies</span></div>
+            <div class="table-wrap"><table id="recentProxiesTable"><tr><td class="loader">Loading…</td></tr></table></div>
           </div>
         </div>
       </div>
@@ -342,22 +342,22 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
       <div class="page" id="page-users">
         <div class="page-header">
           <div>
-            <div class="page-title">Utilisateurs</div>
-            <div class="page-sub">Gérer les comptes et balances</div>
+            <div class="page-title">Users</div>
+            <div class="page-sub">Manage accounts and balances</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
             <div class="search-row" style="margin:0;flex:1">
-              <input class="search-input" id="userSearch" placeholder="🔍 Email ou PSID…" oninput="debounce(loadUsers,400)()">
+              <input class="search-input" id="userSearch" placeholder="🔍 Email or PSID…" oninput="debounce(loadUsers,400)()">
             </div>
           </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>Email</th><th>PSID</th><th>Balance</th><th>Statut</th><th>Inscrit</th><th>Actions</th>
+                <th>Email</th><th>PSID</th><th>Balance</th><th>Status</th><th>Registered</th><th>Actions</th>
               </tr></thead>
-              <tbody id="usersBody"><tr><td colspan="6" class="loader">Chargement…</td></tr></tbody>
+              <tbody id="usersBody"><tr><td colspan="6" class="loader">Loading…</td></tr></tbody>
             </table>
           </div>
           <div class="card-body" id="usersPagination" style="padding:.7rem 1rem"></div>
@@ -368,25 +368,25 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
       <div class="page" id="page-topups">
         <div class="page-header">
           <div>
-            <div class="page-title">Demandes Top-up</div>
-            <div class="page-sub">Approuver ou rejeter les recharges</div>
+            <div class="page-title">Top-up Requests</div>
+            <div class="page-sub">Approve or reject recharge requests</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
             <select class="search-input" style="max-width:180px" id="topupFilter" onchange="loadTopups()">
-              <option value="">Tous les statuts</option>
-              <option value="PENDING" selected>⏳ En attente</option>
-              <option value="APPROVED">✅ Approuvé</option>
-              <option value="REJECTED">❌ Rejeté</option>
+              <option value="">All statuses</option>
+              <option value="PENDING" selected>⏳ Pending</option>
+              <option value="APPROVED">✅ Approved</option>
+              <option value="REJECTED">❌ Rejected</option>
             </select>
           </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>Utilisateur</th><th>Montant</th><th>Statut</th><th>Date</th><th>Actions</th>
+                <th>User</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th>
               </tr></thead>
-              <tbody id="topupsBody"><tr><td colspan="5" class="loader">Chargement…</td></tr></tbody>
+              <tbody id="topupsBody"><tr><td colspan="5" class="loader">Loading…</td></tr></tbody>
             </table>
           </div>
           <div class="card-body" id="topupsPagination" style="padding:.7rem 1rem"></div>
@@ -397,25 +397,25 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
       <div class="page" id="page-support">
         <div class="page-header">
           <div>
-            <div class="page-title">Messages Support</div>
-            <div class="page-sub">Répondre directement sur Messenger</div>
+            <div class="page-title">Support Messages</div>
+            <div class="page-sub">Reply directly via Messenger</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
             <select class="search-input" style="max-width:180px" id="supportFilter" onchange="loadSupport()">
-              <option value="NEW" selected>🆕 Nouveaux</option>
-              <option value="READING">👁 En lecture</option>
-              <option value="REPLIED">✅ Répondus</option>
-              <option value="">Tous</option>
+              <option value="NEW" selected>🆕 New</option>
+              <option value="READING">👁 Reading</option>
+              <option value="REPLIED">✅ Replied</option>
+              <option value="">All</option>
             </select>
           </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>Utilisateur</th><th>Message</th><th>Catégorie</th><th>Statut</th><th>Date</th><th>Actions</th>
+                <th>User</th><th>Message</th><th>Category</th><th>Status</th><th>Date</th><th>Actions</th>
               </tr></thead>
-              <tbody id="supportBody"><tr><td colspan="6" class="loader">Chargement…</td></tr></tbody>
+              <tbody id="supportBody"><tr><td colspan="6" class="loader">Loading…</td></tr></tbody>
             </table>
           </div>
           <div class="card-body" id="supportPagination" style="padding:.7rem 1rem"></div>
@@ -427,24 +427,24 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <div class="page-header">
           <div>
             <div class="page-title">Proxies</div>
-            <div class="page-sub">Tous les proxies achetés</div>
+            <div class="page-sub">All purchased proxies</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
             <select class="search-input" style="max-width:180px" id="proxyFilter" onchange="loadProxies()">
-              <option value="">Tous</option>
-              <option value="ACTIVE">🟢 Actifs</option>
-              <option value="EXPIRED">🔴 Expirés</option>
-              <option value="SUSPENDED">⚠️ Suspendus</option>
+              <option value="">All</option>
+              <option value="ACTIVE">🟢 Active</option>
+              <option value="EXPIRED">🔴 Expired</option>
+              <option value="SUSPENDED">⚠️ Suspended</option>
             </select>
           </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>Utilisateur</th><th>IP:Port</th><th>Protocol</th><th>Pays</th><th>Package</th><th>Prix</th><th>Expire</th><th>Statut</th>
+                <th>User</th><th>IP:Port</th><th>Protocol</th><th>Country</th><th>Package</th><th>Price</th><th>Expires</th><th>Status</th>
               </tr></thead>
-              <tbody id="proxiesBody"><tr><td colspan="8" class="loader">Chargement…</td></tr></tbody>
+              <tbody id="proxiesBody"><tr><td colspan="8" class="loader">Loading…</td></tr></tbody>
             </table>
           </div>
           <div class="card-body" id="proxiesPagination" style="padding:.7rem 1rem"></div>
@@ -459,7 +459,7 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
 <div class="modal-overlay" id="balanceModal" style="display:none" onclick="if(event.target===this)closeModal('balanceModal')">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">💰 Modifier la balance</span>
+      <span class="modal-title">💰 Edit Balance</span>
       <button class="modal-close" onclick="closeModal('balanceModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -468,20 +468,20 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <div class="form-group">
           <label>Action</label>
           <select class="form-input" id="balanceAction">
-            <option value="add">➕ Ajouter</option>
-            <option value="set">🔄 Définir</option>
+            <option value="add">➕ Add</option>
+            <option value="set">🔄 Set</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Montant ($)</label>
+          <label>Amount ($)</label>
           <input class="form-input" type="number" id="balanceAmount" step="0.01" min="0" placeholder="0.00">
         </div>
       </div>
-      <div class="form-hint">L'utilisateur sera notifié sur Messenger automatiquement.</div>
+      <div class="form-hint">The user will be notified on Messenger automatically.</div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('balanceModal')">Annuler</button>
-      <button class="btn btn-success" onclick="saveBalance()">Confirmer</button>
+      <button class="btn btn-ghost" onclick="closeModal('balanceModal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveBalance()">Confirm</button>
     </div>
   </div>
 </div>
@@ -490,19 +490,19 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
 <div class="modal-overlay" id="msgModal" style="display:none" onclick="if(event.target===this)closeModal('msgModal')">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">📣 Message direct Messenger</span>
+      <span class="modal-title">📣 Direct Messenger Message</span>
       <button class="modal-close" onclick="closeModal('msgModal')">✕</button>
     </div>
     <div class="modal-body">
       <div id="msgUserInfo" style="margin-bottom:1rem"></div>
       <div class="form-group">
         <label>Message</label>
-        <textarea class="form-input" id="msgText" placeholder="Votre message à envoyer…"></textarea>
+        <textarea class="form-input" id="msgText" placeholder="Your message to send…"></textarea>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('msgModal')">Annuler</button>
-      <button class="btn btn-primary" onclick="sendDirectMessage()">Envoyer ✈️</button>
+      <button class="btn btn-ghost" onclick="closeModal('msgModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="sendDirectMessage()">Send ✈️</button>
     </div>
   </div>
 </div>
@@ -511,20 +511,20 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
 <div class="modal-overlay" id="replyModal" style="display:none" onclick="if(event.target===this)closeModal('replyModal')">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">💬 Répondre au support</span>
+      <span class="modal-title">💬 Reply to Support</span>
       <button class="modal-close" onclick="closeModal('replyModal')">✕</button>
     </div>
     <div class="modal-body">
       <div id="replyMsgPreview" style="background:var(--panel2);border-radius:8px;padding:.9rem;margin-bottom:1rem;font-size:.85rem;border-left:3px solid var(--accent)"></div>
       <div class="form-group">
-        <label>Votre réponse</label>
-        <textarea class="form-input" id="replyText" placeholder="Écrivez votre réponse…"></textarea>
+        <label>Your reply</label>
+        <textarea class="form-input" id="replyText" placeholder="Write your reply…"></textarea>
       </div>
-      <div class="form-hint">⚡ La réponse sera envoyée directement sur Messenger de l'utilisateur.</div>
+      <div class="form-hint">⚡ The reply will be sent directly to the user's Messenger.</div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('replyModal')">Annuler</button>
-      <button class="btn btn-primary" onclick="sendReply()">Envoyer ✈️</button>
+      <button class="btn btn-ghost" onclick="closeModal('replyModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="sendReply()">Send ✈️</button>
     </div>
   </div>
 </div>
@@ -533,25 +533,25 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
 <div class="modal-overlay" id="topupModal" style="display:none" onclick="if(event.target===this)closeModal('topupModal')">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title" id="topupModalTitle">Traiter la demande</span>
+      <span class="modal-title" id="topupModalTitle">Process Request</span>
       <button class="modal-close" onclick="closeModal('topupModal')">✕</button>
     </div>
     <div class="modal-body">
       <div id="topupInfo" style="margin-bottom:1rem"></div>
       <div class="form-group" id="topupAmountGroup">
-        <label>Montant approuvé ($)</label>
+        <label>Approved Amount ($)</label>
         <input class="form-input" type="number" id="topupAmount" step="0.01" min="0.01">
-        <div class="form-hint">Laissez le montant demandé ou ajustez.</div>
+        <div class="form-hint">Keep the requested amount or adjust it.</div>
       </div>
       <div class="form-group">
-        <label>Note (optionnel)</label>
-        <input class="form-input" type="text" id="topupNote" placeholder="Raison / commentaire…">
+        <label>Note (optional)</label>
+        <input class="form-input" type="text" id="topupNote" placeholder="Reason / comment…">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('topupModal')">Annuler</button>
-      <button class="btn btn-danger" id="topupRejectBtn" onclick="processTopup('reject')">❌ Rejeter</button>
-      <button class="btn btn-success" id="topupApproveBtn" onclick="processTopup('approve')">✅ Approuver</button>
+      <button class="btn btn-ghost" onclick="closeModal('topupModal')">Cancel</button>
+      <button class="btn btn-danger" id="topupRejectBtn" onclick="processTopup('reject')">❌ Reject</button>
+      <button class="btn btn-success" id="topupApproveBtn" onclick="processTopup('approve')">✅ Approve</button>
     </div>
   </div>
 </div>
@@ -560,7 +560,7 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
 <div class="modal-overlay" id="userDetailModal" style="display:none" onclick="if(event.target===this)closeModal('userDetailModal')">
   <div class="modal" style="max-width:620px">
     <div class="modal-header">
-      <span class="modal-title">👤 Détail utilisateur</span>
+      <span class="modal-title">👤 User Detail</span>
       <button class="modal-close" onclick="closeModal('userDetailModal')">✕</button>
     </div>
     <div class="modal-body" id="userDetailBody">
@@ -610,7 +610,7 @@ async function doLogin() {
     const pwd = document.getElementById('pwdInput').value;
     const errEl = document.getElementById('loginErr');
     errEl.textContent = '';
-    if (!pwd) { errEl.textContent = 'Entrez votre mot de passe.'; return; }
+    if (!pwd) { errEl.textContent = 'Please enter your password.'; return; }
     try {
         const res = await fetch('/api/admin/login', {
             method: 'POST',
@@ -618,11 +618,11 @@ async function doLogin() {
             body: JSON.stringify({ password: pwd })
         });
         const data = await res.json();
-        if (!res.ok) { errEl.textContent = 'Mot de passe incorrect.'; return; }
+        if (!res.ok) { errEl.textContent = 'Wrong password.'; return; }
         TOKEN = data.token;
         localStorage.setItem('adminToken', TOKEN);
         initApp();
-    } catch { errEl.textContent = 'Erreur de connexion.'; }
+    } catch { errEl.textContent = 'Connection error.'; }
 }
 
 function doLogout() {
@@ -692,18 +692,18 @@ async function loadDashboard() {
     try {
         const d = await apiFetch('/api/admin/stats');
         document.getElementById('statsGrid').innerHTML = `
-            ${statCard('👥','Utilisateurs', d.totalUsers, `+${d.newUsersWeek} cette semaine`)}
-            ${statCard('🌐','Proxies actifs', d.activeProxies, `${d.totalProxies} au total`)}
-            ${statCard('💰','Revenus total', '$' + d.totalRevenue.toFixed(2), 'Tous proxies confondus')}
-            ${statCard('⏳','Top-up en attente', d.pendingTopups, 'Demandes à traiter', d.pendingTopups > 0 ? 'color:var(--yellow)' : '')}
-            ${statCard('💬','Nouveaux msgs', d.newSupport, 'Support non lu', d.newSupport > 0 ? 'color:var(--red)' : '')}
+            ${statCard('👥','Users', d.totalUsers, `+${d.newUsersWeek} this week`)}
+            ${statCard('🌐','Active proxies', d.activeProxies, `${d.totalProxies} total`)}
+            ${statCard('💰','Total revenue', '$' + d.totalRevenue.toFixed(2), 'All proxies combined')}
+            ${statCard('⏳','Pending top-ups', d.pendingTopups, 'Requests to process', d.pendingTopups > 0 ? 'color:var(--yellow)' : '')}
+            ${statCard('💬','New messages', d.newSupport, 'Unread support', d.newSupport > 0 ? 'color:var(--red)' : '')}
         `;
 
         // Recent users table
         const rut = document.getElementById('recentUsersTable');
-        if (!d.recentUsers?.length) { rut.innerHTML = `<tr><td class="loader">Aucun utilisateur</td></tr>`; }
+        if (!d.recentUsers?.length) { rut.innerHTML = `<tr><td class="loader">No users</td></tr>`; }
         else {
-            rut.innerHTML = `<thead><tr><th>Email</th><th>Balance</th><th>Inscrit</th></tr></thead><tbody>` +
+            rut.innerHTML = `<thead><tr><th>Email</th><th>Balance</th><th>Registered</th></tr></thead><tbody>` +
                 d.recentUsers.map(u => `<tr>
                     <td class="mono">${u.email || '<span style="color:var(--muted)">—</span>'}</td>
                     <td><span style="color:var(--green);font-weight:700">$${(u.balance||0).toFixed(2)}</span></td>
@@ -713,9 +713,9 @@ async function loadDashboard() {
 
         // Recent proxies table
         const rpt = document.getElementById('recentProxiesTable');
-        if (!d.recentProxies?.length) { rpt.innerHTML = `<tr><td class="loader">Aucun proxy</td></tr>`; }
+        if (!d.recentProxies?.length) { rpt.innerHTML = `<tr><td class="loader">No proxies</td></tr>`; }
         else {
-            rpt.innerHTML = `<thead><tr><th>IP</th><th>Pays</th><th>Prix</th><th>Statut</th></tr></thead><tbody>` +
+            rpt.innerHTML = `<thead><tr><th>IP</th><th>Country</th><th>Price</th><th>Status</th></tr></thead><tbody>` +
                 d.recentProxies.map(p => `<tr>
                     <td class="mono">${p.ip}:${p.port}</td>
                     <td>${p.country || '—'}</td>
@@ -748,13 +748,13 @@ async function loadUsers(page = usersCurrentPage) {
     try {
         const d = await apiFetch(`/api/admin/users?search=${encodeURIComponent(search)}&page=${page}&limit=15`);
         if (!d.users.length) {
-            tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><div class="empty-text">Aucun utilisateur trouvé</div></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><div class="empty-text">No users found</div></div></td></tr>`;
         } else {
             tbody.innerHTML = d.users.map(u => `<tr>
                 <td class="mono">${u.email || '<span style="color:var(--muted)">Non connecté</span>'}</td>
                 <td class="mono" style="font-size:.75rem;color:var(--muted)">${u.psid}</td>
                 <td><span style="color:var(--green);font-weight:700">$${(u.balance||0).toFixed(2)}</span></td>
-                <td>${u.isLoggedIn ? '<span class="pill pill-green">Connecté</span>' : '<span class="pill pill-gray">Hors ligne</span>'}</td>
+                <td>${u.isLoggedIn ? '<span class="pill pill-green">Logged in</span>' : '<span class="pill pill-gray">Offline</span>'}</td>
                 <td style="color:var(--muted);font-size:.78rem">${fmtDate(u.createdAt)}</td>
                 <td style="display:flex;gap:.4rem;flex-wrap:wrap">
                     <button class="btn btn-ghost" onclick="openBalanceModal('${u._id}','${u.email||'—'}',${u.balance||0})">💰</button>
@@ -780,7 +780,7 @@ async function loadTopups(page = topupsCurrentPage) {
     try {
         const d = await apiFetch(`/api/admin/topups?status=${status}&page=${page}&limit=15`);
         if (!d.requests.length) {
-            tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">💰</div><div class="empty-text">Aucune demande</div></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">💰</div><div class="empty-text">No requests found</div></div></td></tr>`;
         } else {
             tbody.innerHTML = d.requests.map(r => `<tr>
                 <td class="mono">${r.userId?.email || r.email}</td>
@@ -788,7 +788,7 @@ async function loadTopups(page = topupsCurrentPage) {
                 <td>${topupStatusPill(r.status)}</td>
                 <td style="color:var(--muted);font-size:.78rem">${fmtDate(r.createdAt)}</td>
                 <td>${r.status === 'PENDING'
-                    ? `<button class="btn btn-success" onclick="openTopupModal('${r._id}',${r.amount})">Traiter</button>`
+                    ? `<button class="btn btn-success" onclick="openTopupModal('${r._id}',${r.amount})">Process</button>`
                     : `<span style="color:var(--muted);font-size:.78rem">${r.notes || '—'}</span>`}</td>
             </tr>`).join('');
         }
@@ -809,7 +809,7 @@ async function loadSupport(page = supportCurrentPage) {
     try {
         const d = await apiFetch(`/api/admin/support?status=${status}&page=${page}&limit=15`);
         if (!d.messages.length) {
-            tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">💬</div><div class="empty-text">Aucun message</div></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">💬</div><div class="empty-text">No messages</div></div></td></tr>`;
         } else {
             tbody.innerHTML = d.messages.map(m => `<tr>
                 <td class="mono" style="font-size:.8rem">${m.userId?.email || m.email}</td>
@@ -821,7 +821,7 @@ async function loadSupport(page = supportCurrentPage) {
                 <td>${supportStatusPill(m.status)}</td>
                 <td style="color:var(--muted);font-size:.78rem">${fmtDate(m.createdAt)}</td>
                 <td style="display:flex;gap:.4rem">
-                    <button class="btn btn-primary" onclick="openReplyModal('${m._id}',\`${escJs(m.message)}\`,\`${escJs(m.userId?.email||m.email)}\`)">💬 Répondre</button>
+                    <button class="btn btn-primary" onclick="openReplyModal('${m._id}',\`${escJs(m.message)}\`,\`${escJs(m.userId?.email||m.email)}\`)">💬 Reply</button>
                 </td>
             </tr>`).join('');
         }
@@ -842,7 +842,7 @@ async function loadProxies(page = proxiesCurrentPage) {
     try {
         const d = await apiFetch(`/api/admin/proxies?status=${status}&page=${page}&limit=15`);
         if (!d.proxies.length) {
-            tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🌐</div><div class="empty-text">Aucun proxy</div></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🌐</div><div class="empty-text">No proxies found</div></div></td></tr>`;
         } else {
             tbody.innerHTML = d.proxies.map(p => `<tr>
                 <td class="mono" style="font-size:.78rem">${p.userId?.email || '—'}</td>
@@ -868,7 +868,7 @@ function openBalanceModal(userId, email, balance) {
     _modal.balanceUserId = userId;
     document.getElementById('balanceUserInfo').innerHTML = `<div class="user-profile">
         <div class="user-avatar">${email[0]?.toUpperCase() || '?'}</div>
-        <div class="user-meta"><h3>${email}</h3><p>Balance actuelle: <strong style="color:var(--green)">$${balance.toFixed(2)}</strong></p></div>
+        <div class="user-meta"><h3>${email}</h3><p>Current balance: <strong style="color:var(--green)">$${balance.toFixed(2)}</strong></p></div>
     </div>`;
     document.getElementById('balanceAmount').value = '';
     document.getElementById('balanceAction').value = 'add';
@@ -878,10 +878,10 @@ function openBalanceModal(userId, email, balance) {
 async function saveBalance() {
     const amount = parseFloat(document.getElementById('balanceAmount').value);
     const action = document.getElementById('balanceAction').value;
-    if (isNaN(amount) || amount < 0) { toast('Montant invalide', 'err'); return; }
+    if (isNaN(amount) || amount < 0) { toast('Invalid amount', 'err'); return; }
     try {
         const d = await apiFetch(`/api/admin/users/${_modal.balanceUserId}/balance`, 'PATCH', { amount, action });
-        toast(`Balance mise à jour → $${d.balance.toFixed(2)} ✅`, 'ok');
+        toast(`Balance updated → $${d.balance.toFixed(2)} ✅`, 'ok');
         closeModal('balanceModal');
         if (currentPage === 'users') loadUsers();
         if (currentPage === 'dashboard') loadDashboard();
@@ -890,17 +890,17 @@ async function saveBalance() {
 
 function openMsgModal(userId, email) {
     _modal.msgUserId = userId;
-    document.getElementById('msgUserInfo').innerHTML = `<div style="font-size:.85rem;color:var(--muted)">Envoyer un message à: <strong style="color:var(--text)">${email}</strong></div>`;
+    document.getElementById('msgUserInfo').innerHTML = `<div style="font-size:.85rem;color:var(--muted)">Send a message to: <strong style="color:var(--text)">${email}</strong></div>`;
     document.getElementById('msgText').value = '';
     document.getElementById('msgModal').style.display = 'flex';
 }
 
 async function sendDirectMessage() {
     const message = document.getElementById('msgText').value.trim();
-    if (!message) { toast('Message vide', 'err'); return; }
+    if (!message) { toast('Empty message', 'err'); return; }
     try {
         await apiFetch(`/api/admin/users/${_modal.msgUserId}/message`, 'POST', { message });
-        toast('Message envoyé sur Messenger ✅', 'ok');
+        toast('Message sent on Messenger ✅', 'ok');
         closeModal('msgModal');
     } catch (e) { toast(e.message, 'err'); }
 }
@@ -908,7 +908,7 @@ async function sendDirectMessage() {
 function openReplyModal(msgId, message, email) {
     _modal.replyMsgId = msgId;
     document.getElementById('replyMsgPreview').innerHTML =
-        `<div style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">💬 De: <strong>${email}</strong></div>` +
+        `<div style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">💬 From: <strong>${email}</strong></div>` +
         `<div>${message}</div>`;
     document.getElementById('replyText').value = '';
     document.getElementById('replyModal').style.display = 'flex';
@@ -916,10 +916,10 @@ function openReplyModal(msgId, message, email) {
 
 async function sendReply() {
     const reply = document.getElementById('replyText').value.trim();
-    if (!reply) { toast('Réponse vide', 'err'); return; }
+    if (!reply) { toast('Empty reply', 'err'); return; }
     try {
         await apiFetch(`/api/admin/support/${_modal.replyMsgId}/reply`, 'PATCH', { reply });
-        toast('Réponse envoyée sur Messenger ✅', 'ok');
+        toast('Reply sent on Messenger ✅', 'ok');
         closeModal('replyModal');
         loadSupport();
         loadBadges();
@@ -931,7 +931,7 @@ function openTopupModal(id, amount) {
     document.getElementById('topupAmount').value = amount.toFixed(2);
     document.getElementById('topupNote').value = '';
     document.getElementById('topupInfo').innerHTML =
-        `<div style="font-size:.85rem;color:var(--muted)">Montant demandé: <strong style="color:var(--yellow)">$${amount.toFixed(2)}</strong></div>`;
+        `<div style="font-size:.85rem;color:var(--muted)">Requested amount: <strong style="color:var(--yellow)">$${amount.toFixed(2)}</strong></div>`;
     document.getElementById('topupModal').style.display = 'flex';
 }
 
@@ -940,12 +940,12 @@ async function processTopup(action) {
     const notes = document.getElementById('topupNote').value.trim();
     try {
         if (action === 'approve') {
-            if (isNaN(amount) || amount <= 0) { toast('Montant invalide', 'err'); return; }
+            if (isNaN(amount) || amount <= 0) { toast('Invalid amount', 'err'); return; }
             await apiFetch(`/api/admin/topups/${_modal.topupId}/approve`, 'PATCH', { amount, notes });
-            toast('Top-up approuvé ✅ — Utilisateur notifié', 'ok');
+            toast('Top-up approved ✅ — User notified', 'ok');
         } else {
             await apiFetch(`/api/admin/topups/${_modal.topupId}/reject`, 'PATCH', { notes });
-            toast('Top-up rejeté — Utilisateur notifié', 'ok');
+            toast('Top-up rejected — User notified', 'ok');
         }
         closeModal('topupModal');
         loadTopups();
@@ -963,7 +963,7 @@ async function openUserDetail(userId) {
             <div class="user-profile">
                 <div class="user-avatar">${(u.email||'?')[0].toUpperCase()}</div>
                 <div class="user-meta">
-                    <h3>${u.email || 'Pas de compte'}</h3>
+                    <h3>${u.email || 'No account'}</h3>
                     <p>PSID: ${u.psid} · Balance: <strong style="color:var(--green)">$${(u.balance||0).toFixed(2)}</strong></p>
                 </div>
             </div>
@@ -971,17 +971,17 @@ async function openUserDetail(userId) {
                 <div style="background:var(--panel2);border-radius:8px;padding:.8rem">
                     <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">PROXIES</div>
                     <div style="font-size:1.3rem;font-weight:800">${d.proxies.length}</div>
-                    <div style="font-size:.75rem;color:var(--green)">${d.proxies.filter(p=>p.status==='ACTIVE').length} actifs</div>
+                    <div style="font-size:.75rem;color:var(--green)">${d.proxies.filter(p=>p.status==='ACTIVE').length} active</div>
                 </div>
                 <div style="background:var(--panel2);border-radius:8px;padding:.8rem">
                     <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">TOP-UPS</div>
                     <div style="font-size:1.3rem;font-weight:800">${d.topups.length}</div>
-                    <div style="font-size:.75rem;color:var(--yellow)">${d.topups.filter(t=>t.status==='PENDING').length} en attente</div>
+                    <div style="font-size:.75rem;color:var(--yellow)">${d.topups.filter(t=>t.status==='PENDING').length} pending</div>
                 </div>
             </div>
             ${d.proxies.length ? `
-            <div style="font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:.4rem">Proxies récents</div>
-            <div style="overflow-x:auto"><table><thead><tr><th>IP:Port</th><th>Pays</th><th>Expire</th><th>Statut</th></tr></thead><tbody>
+            <div style="font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:.4rem">Recent proxies</div>
+            <div style="overflow-x:auto"><table><thead><tr><th>IP:Port</th><th>Country</th><th>Expires</th><th>Status</th></tr></thead><tbody>
                 ${d.proxies.slice(0,5).map(p=>`<tr>
                     <td class="mono">${p.ip}:${p.port}</td>
                     <td>${p.country||'—'}</td>
@@ -1021,7 +1021,7 @@ function renderPagination(containerId, current, total, fn) {
 
 function fmtDate(d) {
     if (!d) return '—';
-    return new Date(d).toLocaleString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    return new Date(d).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 
 function statusPill(s) {
