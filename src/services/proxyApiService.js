@@ -45,22 +45,16 @@ async function getToken() {
 async function api(method, endpoint, data = null, params = null) {
     const token = await getToken();
 
-    // Yii2 supports two auth methods depending on server config:
-    //   1. QueryParamAuth  → ?access-token=TOKEN  (Yii2 default)
-    //   2. HttpBearerAuth  → Authorization: Bearer TOKEN
-    // We send BOTH to cover either configuration.
+    // This Yii2 API uses QueryParamAuth — token goes as ?access-token=TOKEN only.
+    // Sending an Authorization header causes "Invalid auth header" even with a valid token.
     const cfg = {
         method,
         url:     `${BASE}${endpoint}`,
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        params:  { 'access-token': token },  // Yii2 QueryParamAuth
+        headers: { 'Content-Type': 'application/json' },
+        params:  { 'access-token': token },
         timeout: 15000
     };
 
-    // Merge any extra query params passed by caller
     if (params) cfg.params = { ...cfg.params, ...params };
     if (data)   cfg.data   = data;
 
@@ -71,12 +65,10 @@ async function api(method, endpoint, data = null, params = null) {
         const errBody = JSON.stringify(err.response?.data);
         console.error(`❌ Proxy API ${method} ${endpoint} → HTTP ${status}:`, errBody);
 
-        // Token expired mid-session — force refresh and retry once
         if (status === 401) {
             _token = null;
             const newToken = await getToken();
-            cfg.headers['Authorization'] = `Bearer ${newToken}`;
-            cfg.params['access-token']   = newToken;
+            cfg.params['access-token'] = newToken;
             return (await axios(cfg)).data;
         }
         throw err;
