@@ -1,676 +1,1062 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>ProxyBot — Admin Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProxyBot Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0a0c12;
-    --surface: #12151e;
-    --surface2: #1a1e2e;
-    --border: #252a3a;
-    --accent: #4f6ef7;
-    --accent2: #7c3aed;
-    --green: #10b981;
-    --red: #ef4444;
-    --yellow: #f59e0b;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --radius: 12px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { 
-    background: var(--bg); 
-    color: var(--text); 
-    font-family: 'Segoe UI', system-ui, sans-serif; 
-    min-height: 100vh; 
-    overflow-x: hidden;
-  }
+/* ── Reset & Base ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0f1a;
+  --panel:#111827;
+  --panel2:#1a2235;
+  --border:#1e2d45;
+  --accent:#00c6ff;
+  --accent2:#6366f1;
+  --green:#10b981;
+  --yellow:#f59e0b;
+  --red:#ef4444;
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --card:#131f35;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --radius:12px;
+}
+html,body{height:100%;font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--panel)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 
-  /* ── Login screen ─── */
-  #login-screen {
-    display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; background: var(--bg); padding: 16px;
-  }
-  #login-box {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 40px 24px; width: 100%; max-width: 400px; text-align: center;
-  }
-  #login-box h1 { font-size: 1.5rem; margin-bottom: 8px; }
-  #login-box p  { color: var(--muted); margin-bottom: 28px; font-size: 0.9rem; }
-  #login-box input {
-    width: 100%; padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); font-size: 1rem; margin-bottom: 14px; font-size: 16px;
-  }
-  #login-box button {
-    width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none;
-    border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
-    transition: opacity .2s;
-  }
-  #login-box button:hover { opacity: .85; }
-  #login-error { color: var(--red); margin-top: 12px; font-size: .85rem; }
+/* ── Login Screen ─────────────────────────────────────────── */
+#loginScreen{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 60% 20%, #0d1f3c 0%, var(--bg) 70%);
+  z-index:1000
+}
+.login-box{
+  background:var(--panel);border:1px solid var(--border);border-radius:20px;
+  padding:2.5rem;width:360px;box-shadow:0 0 60px rgba(0,198,255,.08)
+}
+.login-logo{
+  display:flex;align-items:center;gap:10px;margin-bottom:2rem;
+  font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700
+}
+.login-logo .dot{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-size:1rem
+}
+.login-box h2{font-size:1.3rem;font-weight:700;margin-bottom:.4rem}
+.login-box p{color:var(--muted);font-size:.85rem;margin-bottom:1.6rem}
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+.form-input{
+  width:100%;padding:.7rem 1rem;background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s
+}
+.form-input:focus{border-color:var(--accent)}
+.btn-login{
+  width:100%;padding:.8rem;border:none;border-radius:8px;cursor:pointer;font-weight:700;
+  font-size:.95rem;font-family:'Outfit',sans-serif;margin-top:.5rem;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+  transition:opacity .2s
+}
+.btn-login:hover{opacity:.88}
+.login-error{color:var(--red);font-size:.82rem;margin-top:.6rem;text-align:center;min-height:1rem}
 
-  /* ── App ─── */
-  #app { display: none; }
-  header {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 16px; display: flex; align-items: center; justify-content: space-between;
-    height: 60px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap;
-  }
-  .logo { font-size: 1rem; font-weight: 700; white-space: nowrap; }
-  .logo span { color: var(--accent); }
-  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .badge-api { font-size: .75rem; padding: 4px 8px; background: var(--surface2);
-    border: 1px solid var(--border); border-radius: 20px; white-space: nowrap; }
-  .badge-api.ok  { border-color: var(--green); color: var(--green); }
-  .badge-api.err { border-color: var(--red);   color: var(--red); }
-  .btn-logout { background: none; border: 1px solid var(--border); color: var(--muted);
-    padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: .8rem; }
-  .btn-logout:hover { color: var(--text); }
+/* ── Layout ───────────────────────────────────────────────── */
+#app{display:none;height:100%;flex-direction:column}
+.topbar{
+  height:56px;background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 1.5rem;gap:1rem;flex-shrink:0;
+  position:sticky;top:0;z-index:100
+}
+.topbar-logo{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.95rem;
+  display:flex;align-items:center;gap:8px
+}
+.topbar-logo .badge{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  padding:2px 8px;border-radius:5px;font-size:.7rem;color:#fff
+}
+.topbar-spacer{flex:1}
+.topbar-info{font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.btn-sm{
+  padding:.35rem .8rem;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;font-size:.8rem;
+  font-family:'Outfit',sans-serif;transition:all .2s
+}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent)}
 
-  /* ── Nav ─── */
-  nav { 
-    display: flex; gap: 4px; padding: 0 16px; background: var(--surface);
-    border-bottom: 1px solid var(--border); overflow-x: auto; width: 100%;
-  }
-  nav button {
-    background: none; border: none; color: var(--muted); padding: 12px 12px;
-    cursor: pointer; font-size: .8rem; white-space: nowrap; border-bottom: 2px solid transparent;
-    transition: color .2s; flex-shrink: 0;
-  }
-  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
-  nav button:hover  { color: var(--text); }
+.body-wrap{display:flex;flex:1;overflow:hidden}
 
-  /* ── Layout ─── */
-  main { padding: 16px; max-width: 1400px; margin: 0 auto; }
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
+/* ── Sidebar ──────────────────────────────────────────────── */
+.sidebar{
+  width:220px;background:var(--panel);border-right:1px solid var(--border);
+  flex-shrink:0;display:flex;flex-direction:column;overflow-y:auto
+}
+.nav-section{padding:.8rem .8rem .3rem;font-size:.68rem;font-weight:700;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.nav-item{
+  display:flex;align-items:center;gap:.7rem;padding:.6rem 1rem;
+  margin:1px .5rem;border-radius:8px;cursor:pointer;transition:all .2s;
+  font-size:.88rem;font-weight:500;color:var(--muted);border:none;
+  background:transparent;width:calc(100% - 1rem);text-align:left
+}
+.nav-item:hover{background:var(--panel2);color:var(--text)}
+.nav-item.active{background:rgba(0,198,255,.12);color:var(--accent);font-weight:600}
+.nav-item .icon{font-size:1rem;width:18px;text-align:center}
+.nav-badge{
+  margin-left:auto;background:var(--red);color:#fff;border-radius:100px;
+  font-size:.65rem;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;
+  display:none
+}
+.nav-badge.show{display:block}
 
-  /* ── Stats cards ─── */
-  .stats-grid { 
-    display: grid; 
-    grid-template-columns: 1fr;
-    gap: 12px; 
-    margin-bottom: 20px; 
-  }
-  @media (min-width: 480px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (min-width: 768px) {
-    .stats-grid { grid-template-columns: repeat(4, 1fr); }
-  }
-  .stat-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; display: flex; flex-direction: column; gap: 6px;
-  }
-  .stat-card .label { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
-  .stat-card .value { font-size: 1.5rem; font-weight: 700; }
-  .stat-card .sub   { color: var(--muted); font-size: .75rem; }
-  .stat-card.green .value { color: var(--green); }
-  .stat-card.blue  .value { color: var(--accent); }
-  .stat-card.red  .value { color: var(--red); }
+/* ── Main Content ─────────────────────────────────────────── */
+.main{flex:1;overflow-y:auto;padding:1.5rem}
+.page{display:none}
+.page.active{display:block}
 
-  /* ── Charts ─── */
-  .charts-row { 
-    display: grid; 
-    grid-template-columns: 1fr; 
-    gap: 12px; 
-    margin-bottom: 20px; 
-  }
-  @media (min-width: 768px) {
-    .charts-row { grid-template-columns: 2fr 1fr; }
-  }
-  .chart-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
-  }
-  .chart-card h3 { font-size: .9rem; margin-bottom: 12px; color: var(--muted); }
+.page-header{margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:gap}
+.page-title{font-size:1.4rem;font-weight:700}
+.page-sub{color:var(--muted);font-size:.85rem;margin-top:.2rem}
 
-  /* ── Tables ─── */
-  .table-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    overflow: hidden; margin-bottom: 16px;
-  }
-  .table-toolbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap;
-  }
-  .table-toolbar h3 { font-size: .9rem; font-weight: 600; }
-  .table-toolbar .controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-  .table-toolbar input, .table-toolbar select {
-    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-    padding: 6px 10px; border-radius: 6px; font-size: .8rem;
-  }
-  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-  th { background: var(--surface2); padding: 10px; font-size: .75rem;
-       text-transform: uppercase; letter-spacing: .06em; color: var(--muted); text-align: left; }
-  td { padding: 10px; font-size: .8rem; border-top: 1px solid var(--border); word-break: break-word; }
-  tr:hover td { background: var(--surface2); }
-  .pagination { display: flex; align-items: center; justify-content: center; gap: 6px;
-                padding: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
-  .pagination button {
-    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: .75rem;
-  }
-  .pagination button:disabled { opacity: .4; cursor: default; }
-  .pagination .info { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+/* ── Cards & Stats ────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1.1rem 1.2rem;position:relative;overflow:hidden
+}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2))
+}
+.stat-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.4rem}
+.stat-val{font-size:1.9rem;font-weight:800;line-height:1;font-family:'JetBrains Mono',monospace}
+.stat-sub{font-size:.75rem;color:var(--muted);margin-top:.3rem}
+.stat-icon{position:absolute;right:1rem;top:50%;transform:translateY(-50%);font-size:2rem;opacity:.08}
 
-  /* ── Badges ─── */
-  .badge {
-    display: inline-block; padding: 3px 8px; border-radius: 20px;
-    font-size: .7rem; font-weight: 600;
-  }
-  .badge.green  { background: rgba(16,185,129,.15); color: var(--green); }
-  .badge.red    { background: rgba(239,68,68,.15);  color: var(--red); }
-  .badge.yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
-  .badge.blue   { background: rgba(79,110,247,.15); color: var(--accent); }
-  .badge.gray   { background: rgba(100,116,139,.15);color: var(--muted); }
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem}
+.card-header{padding:.9rem 1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.card-title{font-weight:700;font-size:.95rem}
+.card-body{padding:1.2rem}
 
-  /* ── Activity feed ─── */
-  .activity-list { padding: 4px 0; }
-  .activity-item {
-    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
-    border-bottom: 1px solid var(--border);
-  }
-  .activity-item:last-child { border-bottom: none; }
-  .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
-  .activity-dot.purchase { background: var(--green); }
-  .activity-dot.register { background: var(--accent); }
-  .activity-dot.support  { background: var(--yellow); }
-  .activity-dot.topup    { background: #a855f7; }
-  .activity-label { font-size: .8rem; }
-  .activity-meta  { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+/* ── Tables ───────────────────────────────────────────────── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{padding:.6rem 1rem;text-align:left;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.7rem 1rem;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.8rem}
 
-  /* ── Loading ─── */
-  .loading { text-align: center; padding: 30px 16px; color: var(--muted); font-size: .9rem; }
-  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border);
-             border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ── Badges / Pills ───────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:.3rem;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pill-green{background:rgba(16,185,129,.15);color:#10b981}
+.pill-red{background:rgba(239,68,68,.15);color:#ef4444}
+.pill-yellow{background:rgba(245,158,11,.15);color:#f59e0b}
+.pill-blue{background:rgba(99,102,241,.15);color:#818cf8}
+.pill-gray{background:rgba(100,116,139,.15);color:#94a3b8}
 
-  /* ── Mobile Responsive ─── */
-  @media (max-width: 480px) {
-    header { padding: 0 12px; }
-    nav { padding: 0 12px; }
-    main { padding: 12px; }
-    nav button { padding: 10px 8px; font-size: .75rem; }
-    .logo { font-size: .9rem; }
-    .badge-api { font-size: .7rem; padding: 2px 6px; }
-    .btn-logout { padding: 4px 8px; font-size: .75rem; }
-    table { font-size: .75rem; }
-    th { padding: 8px; font-size: .7rem; }
-    td { padding: 8px; font-size: .75rem; }
-    .stat-card { padding: 12px; }
-    .stat-card .value { font-size: 1.2rem; }
-  }
+/* ── Buttons ──────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;
+  border-radius:7px;font-size:.82rem;font-weight:600;cursor:pointer;
+  border:none;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap
+}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:#33d6ff}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{opacity:.85}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{opacity:.85}
+.btn-warning{background:var(--yellow);color:#000}
+.btn-warning:hover{opacity:.85}
+.btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Search / Filter ──────────────────────────────────────── */
+.search-row{display:flex;gap:.7rem;margin-bottom:1rem;flex-wrap:wrap}
+.search-input{
+  flex:1;min-width:180px;padding:.55rem .9rem;background:var(--panel2);
+  border:1px solid var(--border);border-radius:8px;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:.85rem;outline:none;transition:border-color .2s
+}
+.search-input:focus{border-color:var(--accent)}
+select.search-input{cursor:pointer}
+
+/* ── Pagination ───────────────────────────────────────────── */
+.pagination{display:flex;gap:.4rem;align-items:center;margin-top:1rem;justify-content:center}
+.page-btn{
+  padding:.35rem .75rem;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--muted);cursor:pointer;font-size:.8rem;
+  font-family:'Outfit',sans-serif;transition:all .2s
+}
+.page-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.page-btn:hover:not(.active):not(:disabled){border-color:var(--accent);color:var(--accent)}
+.page-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Modal ────────────────────────────────────────────────── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem
+}
+.modal{
+  background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)
+}
+.modal-header{padding:1.2rem 1.4rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-weight:700;font-size:1rem}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;padding:.2rem;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:1.4rem}
+.modal-footer{padding:1rem 1.4rem;border-top:1px solid var(--border);display:flex;gap:.7rem;justify-content:flex-end}
+
+textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-hint{font-size:.75rem;color:var(--muted);margin-top:.3rem}
+
+/* ── User detail profile ──────────────────────────────────── */
+.user-profile{display:flex;align-items:center;gap:1rem;margin-bottom:1.4rem;padding:1.2rem;background:var(--panel2);border-radius:10px;border:1px solid var(--border)}
+.user-avatar{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:800;flex-shrink:0}
+.user-meta h3{font-size:1rem;font-weight:700;margin-bottom:.2rem}
+.user-meta p{font-size:.78rem;color:var(--muted)}
+
+/* ── Loader ───────────────────────────────────────────────── */
+.loader{text-align:center;padding:2rem;color:var(--muted);font-size:.85rem}
+.spinner{display:inline-block;width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Toast ────────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
+  background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:.75rem 1.2rem;font-size:.85rem;font-weight:600;
+  transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px;
+  box-shadow:var(--shadow)
+}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{border-left:3px solid var(--green)}
+#toast.err{border-left:3px solid var(--red)}
+
+/* ── Two-col grid ─────────────────────────────────────────── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+@media(max-width:700px){.stats-grid{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}}
+@media(max-width:500px){.stats-grid{grid-template-columns:1fr}.sidebar{width:56px}.nav-item span{display:none}}
+
+/* ── Empty state ──────────────────────────────────────────── */
+.empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty-icon{font-size:2.5rem;margin-bottom:.7rem}
+.empty-text{font-size:.9rem}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
-  <div id="login-box">
-    <div style="font-size:2.4rem;margin-bottom:12px">🛡️</div>
-    <h1>ProxyBot Admin</h1>
-    <p>Enter your admin token</p>
-    <input type="password" id="token-input" placeholder="Admin token…" />
-    <button id="login-btn">Login</button>
-    <div id="login-error"></div>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="dot">⚡</div>
+      ProxyBot <span class="badge">ADMIN</span>
+    </div>
+    <h2>Accès sécurisé</h2>
+    <p>Connectez-vous au panel administrateur</p>
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input class="form-input" type="password" id="pwdInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Se connecter →</button>
+    <div class="login-error" id="loginErr"></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app">
-  <header>
-    <div class="logo">Proxy<span>Bot</span> <span style="color:var(--muted);font-size:.75rem;font-weight:400">Admin</span></div>
-    <div class="header-right">
-      <span class="badge-api" id="api-balance-badge">Balance: …</span>
-      <button class="btn-logout" id="logout-btn">Logout</button>
-    </div>
-  </header>
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo">⚡ ProxyBot <span class="badge">ADMIN</span></div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-info" id="topbarTime"></div>
+    <button class="btn-sm" onclick="refreshCurrentPage()">↻ Refresh</button>
+    <button class="btn-sm" onclick="doLogout()">Déconnexion</button>
+  </div>
 
-  <nav>
-    <button class="active" data-tab="overview">📊 Overview</button>
-    <button data-tab="users">👤 Users</button>
-    <button data-tab="proxies">🌐 Proxies</button>
-    <button data-tab="support">💬 Support</button>
-    <button data-tab="topups">💳 Top-ups</button>
-    <button data-tab="activity">🕐 Activity</button>
-  </nav>
-
-  <main>
-
-    <!-- OVERVIEW -->
-    <div class="tab-content active" id="tab-overview">
-      <div class="stats-grid" id="stats-grid">
-        <div class="loading"><div class="spinner"></div></div>
-      </div>
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>Revenue (Last 30 Days)</h3>
-          <canvas id="revenue-chart" height="80"></canvas>
-        </div>
-        <div class="chart-card">
-          <h3>Proxy Status</h3>
-          <canvas id="proxy-status-chart" height="120"></canvas>
-        </div>
-      </div>
+  <div class="body-wrap">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="nav-section">Menu</div>
+      <button class="nav-item active" onclick="nav('dashboard')" id="nav-dashboard">
+        <span class="icon">📊</span><span>Dashboard</span>
+      </button>
+      <button class="nav-item" onclick="nav('users')" id="nav-users">
+        <span class="icon">👥</span><span>Utilisateurs</span>
+      </button>
+      <button class="nav-item" onclick="nav('topups')" id="nav-topups">
+        <span class="icon">💰</span><span>Top-up</span>
+        <span class="nav-badge" id="badge-topups">0</span>
+      </button>
+      <div class="nav-section">Support</div>
+      <button class="nav-item" onclick="nav('support')" id="nav-support">
+        <span class="icon">💬</span><span>Messages</span>
+        <span class="nav-badge" id="badge-support">0</span>
+      </button>
+      <div class="nav-section">Données</div>
+      <button class="nav-item" onclick="nav('proxies')" id="nav-proxies">
+        <span class="icon">🌐</span><span>Proxies</span>
+      </button>
     </div>
 
-    <!-- USERS -->
-    <div class="tab-content" id="tab-users">
-      <div class="table-card">
-        <div class="table-toolbar">
-          <h3>Users</h3>
-          <div class="controls">
-            <input type="text" id="user-search" placeholder="Email or name…" style="width:100%;max-width:200px" />
+    <!-- Main -->
+    <div class="main">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Dashboard</div>
+            <div class="page-sub">Vue d'ensemble en temps réel</div>
           </div>
         </div>
-        <div id="users-table-body"><div class="loading"><div class="spinner"></div></div></div>
-        <div class="pagination" id="users-pagination"></div>
+        <div class="stats-grid" id="statsGrid">
+          <div class="loader"><div class="spinner"></div></div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">👤 Derniers utilisateurs</span></div>
+            <div class="table-wrap"><table id="recentUsersTable"><tr><td class="loader">Chargement…</td></tr></table></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">🌐 Derniers proxies</span></div>
+            <div class="table-wrap"><table id="recentProxiesTable"><tr><td class="loader">Chargement…</td></tr></table></div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- PROXIES -->
-    <div class="tab-content" id="tab-proxies">
-      <div class="table-card">
-        <div class="table-toolbar">
-          <h3>Purchased Proxies</h3>
-          <div class="controls">
-            <select id="proxy-filter">
-              <option value="">All</option>
-              <option value="ACTIVE">Active</option>
-              <option value="EXPIRED">Expired</option>
-              <option value="SUSPENDED">Suspended</option>
+      <!-- USERS -->
+      <div class="page" id="page-users">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Utilisateurs</div>
+            <div class="page-sub">Gérer les comptes et balances</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="search-row" style="margin:0;flex:1">
+              <input class="search-input" id="userSearch" placeholder="🔍 Email ou PSID…" oninput="debounce(loadUsers,400)()">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Email</th><th>PSID</th><th>Balance</th><th>Statut</th><th>Inscrit</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="usersBody"><tr><td colspan="6" class="loader">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="card-body" id="usersPagination" style="padding:.7rem 1rem"></div>
+        </div>
+      </div>
+
+      <!-- TOP-UP -->
+      <div class="page" id="page-topups">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Demandes Top-up</div>
+            <div class="page-sub">Approuver ou rejeter les recharges</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <select class="search-input" style="max-width:180px" id="topupFilter" onchange="loadTopups()">
+              <option value="">Tous les statuts</option>
+              <option value="PENDING" selected>⏳ En attente</option>
+              <option value="APPROVED">✅ Approuvé</option>
+              <option value="REJECTED">❌ Rejeté</option>
             </select>
           </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Utilisateur</th><th>Montant</th><th>Statut</th><th>Date</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="topupsBody"><tr><td colspan="5" class="loader">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="card-body" id="topupsPagination" style="padding:.7rem 1rem"></div>
         </div>
-        <div id="proxies-table-body"><div class="loading"><div class="spinner"></div></div></div>
-        <div class="pagination" id="proxies-pagination"></div>
       </div>
-    </div>
 
-    <!-- SUPPORT -->
-    <div class="tab-content" id="tab-support">
-      <div class="table-card">
-        <div class="table-toolbar">
-          <h3>Support Messages</h3>
-          <div class="controls">
-            <select id="support-filter">
-              <option value="">All</option>
-              <option value="OPEN">Open</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="CLOSED">Closed</option>
-            </select>
+      <!-- SUPPORT -->
+      <div class="page" id="page-support">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Messages Support</div>
+            <div class="page-sub">Répondre directement sur Messenger</div>
           </div>
         </div>
-        <div id="support-table-body"><div class="loading"><div class="spinner"></div></div></div>
-        <div class="pagination" id="support-pagination"></div>
-      </div>
-    </div>
-
-    <!-- TOPUPS -->
-    <div class="tab-content" id="tab-topups">
-      <div class="table-card">
-        <div class="table-toolbar">
-          <h3>Top-up Requests</h3>
-          <div class="controls">
-            <select id="topup-filter">
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="">All</option>
+        <div class="card">
+          <div class="card-header">
+            <select class="search-input" style="max-width:180px" id="supportFilter" onchange="loadSupport()">
+              <option value="NEW" selected>🆕 Nouveaux</option>
+              <option value="READING">👁 En lecture</option>
+              <option value="REPLIED">✅ Répondus</option>
+              <option value="">Tous</option>
             </select>
           </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Utilisateur</th><th>Message</th><th>Catégorie</th><th>Statut</th><th>Date</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="supportBody"><tr><td colspan="6" class="loader">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="card-body" id="supportPagination" style="padding:.7rem 1rem"></div>
         </div>
-        <div id="topups-table-body"><div class="loading"><div class="spinner"></div></div></div>
-        <div class="pagination" id="topups-pagination"></div>
       </div>
-    </div>
 
-    <!-- ACTIVITY -->
-    <div class="tab-content" id="tab-activity">
-      <div class="table-card">
-        <div class="table-toolbar"><h3>Recent Activity</h3></div>
-        <div class="activity-list" id="activity-list"><div class="loading"><div class="spinner"></div></div></div>
+      <!-- PROXIES -->
+      <div class="page" id="page-proxies">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Proxies</div>
+            <div class="page-sub">Tous les proxies achetés</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <select class="search-input" style="max-width:180px" id="proxyFilter" onchange="loadProxies()">
+              <option value="">Tous</option>
+              <option value="ACTIVE">🟢 Actifs</option>
+              <option value="EXPIRED">🔴 Expirés</option>
+              <option value="SUSPENDED">⚠️ Suspendus</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Utilisateur</th><th>IP:Port</th><th>Protocol</th><th>Pays</th><th>Package</th><th>Prix</th><th>Expire</th><th>Statut</th>
+              </tr></thead>
+              <tbody id="proxiesBody"><tr><td colspan="8" class="loader">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="card-body" id="proxiesPagination" style="padding:.7rem 1rem"></div>
+        </div>
       </div>
-    </div>
 
-  </main>
+    </div><!-- /main -->
+  </div><!-- /body-wrap -->
+</div><!-- /app -->
+
+<!-- MODAL: Balance -->
+<div class="modal-overlay" id="balanceModal" style="display:none" onclick="if(event.target===this)closeModal('balanceModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">💰 Modifier la balance</span>
+      <button class="modal-close" onclick="closeModal('balanceModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="balanceUserInfo" style="margin-bottom:1rem"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Action</label>
+          <select class="form-input" id="balanceAction">
+            <option value="add">➕ Ajouter</option>
+            <option value="set">🔄 Définir</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Montant ($)</label>
+          <input class="form-input" type="number" id="balanceAmount" step="0.01" min="0" placeholder="0.00">
+        </div>
+      </div>
+      <div class="form-hint">L'utilisateur sera notifié sur Messenger automatiquement.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('balanceModal')">Annuler</button>
+      <button class="btn btn-success" onclick="saveBalance()">Confirmer</button>
+    </div>
+  </div>
 </div>
 
+<!-- MODAL: Message direct -->
+<div class="modal-overlay" id="msgModal" style="display:none" onclick="if(event.target===this)closeModal('msgModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">📣 Message direct Messenger</span>
+      <button class="modal-close" onclick="closeModal('msgModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="msgUserInfo" style="margin-bottom:1rem"></div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea class="form-input" id="msgText" placeholder="Votre message à envoyer…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('msgModal')">Annuler</button>
+      <button class="btn btn-primary" onclick="sendDirectMessage()">Envoyer ✈️</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Support Reply -->
+<div class="modal-overlay" id="replyModal" style="display:none" onclick="if(event.target===this)closeModal('replyModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">💬 Répondre au support</span>
+      <button class="modal-close" onclick="closeModal('replyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="replyMsgPreview" style="background:var(--panel2);border-radius:8px;padding:.9rem;margin-bottom:1rem;font-size:.85rem;border-left:3px solid var(--accent)"></div>
+      <div class="form-group">
+        <label>Votre réponse</label>
+        <textarea class="form-input" id="replyText" placeholder="Écrivez votre réponse…"></textarea>
+      </div>
+      <div class="form-hint">⚡ La réponse sera envoyée directement sur Messenger de l'utilisateur.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('replyModal')">Annuler</button>
+      <button class="btn btn-primary" onclick="sendReply()">Envoyer ✈️</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Topup approve -->
+<div class="modal-overlay" id="topupModal" style="display:none" onclick="if(event.target===this)closeModal('topupModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="topupModalTitle">Traiter la demande</span>
+      <button class="modal-close" onclick="closeModal('topupModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="topupInfo" style="margin-bottom:1rem"></div>
+      <div class="form-group" id="topupAmountGroup">
+        <label>Montant approuvé ($)</label>
+        <input class="form-input" type="number" id="topupAmount" step="0.01" min="0.01">
+        <div class="form-hint">Laissez le montant demandé ou ajustez.</div>
+      </div>
+      <div class="form-group">
+        <label>Note (optionnel)</label>
+        <input class="form-input" type="text" id="topupNote" placeholder="Raison / commentaire…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('topupModal')">Annuler</button>
+      <button class="btn btn-danger" id="topupRejectBtn" onclick="processTopup('reject')">❌ Rejeter</button>
+      <button class="btn btn-success" id="topupApproveBtn" onclick="processTopup('approve')">✅ Approuver</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: User detail -->
+<div class="modal-overlay" id="userDetailModal" style="display:none" onclick="if(event.target===this)closeModal('userDetailModal')">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <span class="modal-title">👤 Détail utilisateur</span>
+      <button class="modal-close" onclick="closeModal('userDetailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="userDetailBody">
+      <div class="loader"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
 <script>
-// ── Config ─────────────────────────────────────────────────
-let ADMIN_TOKEN = '';
-const API = (path) => `/admin/api${path}`;
-const headers = () => ({ 'x-admin-token': ADMIN_TOKEN, 'Content-Type': 'application/json' });
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let TOKEN = localStorage.getItem('adminToken') || null;
+let currentPage = 'dashboard';
+let _modal = { balanceUserId: null, msgUserId: null, replyMsgId: null, topupId: null, topupAction: null };
+let usersCurrentPage = 1, topupsCurrentPage = 1, supportCurrentPage = 1, proxiesCurrentPage = 1;
 
-// ── Pagination state ───────────────────────────────────────
-const pages = { users: 1, proxies: 1, support: 1, topups: 1 };
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+window.onload = () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+    if (TOKEN) initApp();
+};
 
-// ── Login ──────────────────────────────────────────────────
-document.getElementById('login-btn').addEventListener('click', async () => {
-  const token = document.getElementById('token-input').value.trim();
-  if (!token) return;
-  try {
-    const res = await fetch(API('/stats'), { headers: { 'x-admin-token': token } });
-    if (!res.ok) throw new Error();
-    ADMIN_TOKEN = token;
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    initApp();
-  } catch {
-    document.getElementById('login-error').textContent = '❌ Invalid token or server unreachable.';
-  }
-});
-document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
-document.getElementById('logout-btn').addEventListener('click', () => { ADMIN_TOKEN = ''; location.reload(); });
+function updateClock() {
+    const el = document.getElementById('topbarTime');
+    if (el) el.textContent = new Date().toLocaleString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short' });
+}
 
-// ── Tab navigation ─────────────────────────────────────────
-document.querySelectorAll('nav button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'users')    loadUsers();
-    if (btn.dataset.tab === 'proxies')  loadProxies();
-    if (btn.dataset.tab === 'support')  loadSupport();
-    if (btn.dataset.tab === 'topups')   loadTopups();
-    if (btn.dataset.tab === 'activity') loadActivity();
-  });
-});
-
-// ── Init ───────────────────────────────────────────────────
 function initApp() {
-  loadStats();
-  loadRevenueChart();
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    loadDashboard();
+    loadBadges();
+    setInterval(loadBadges, 30000);
 }
 
-// ── Stats ──────────────────────────────────────────────────
-async function loadStats() {
-  const data = await apiFetch('/stats');
-  if (!data) return;
-
-  const badge = document.getElementById('api-balance-badge');
-  if (data.apiBalance !== undefined && data.apiBalance !== 'N/A') {
-    badge.textContent = `Balance: $${(+data.apiBalance).toFixed(2)}`;
-    badge.className = 'badge-api ok';
-  } else {
-    badge.textContent = 'Balance: N/A';
-    badge.className = 'badge-api err';
-  }
-
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card green">
-      <div class="label">Total Revenue</div>
-      <div class="value">$${data.revenue.total}</div>
-      <div class="sub">This month: $${data.revenue.thisMonth}</div>
-    </div>
-    <div class="stat-card blue">
-      <div class="label">Registered Users</div>
-      <div class="value">${data.users.registered}</div>
-      <div class="sub">Total PSID: ${data.users.total} · Active: ${data.users.active}</div>
-    </div>
-    <div class="stat-card blue">
-      <div class="label">Active Proxies</div>
-      <div class="value">${data.proxies.active}</div>
-      <div class="sub">Total Sold: ${data.proxies.total}</div>
-    </div>
-    <div class="stat-card red">
-      <div class="label">Expired Proxies</div>
-      <div class="value">${data.proxies.expired}</div>
-      <div class="sub">Open Tickets: ${data.support.openTickets} · Pending Top-ups: ${data.topups?.pending || 0}</div>
-    </div>
-  `;
-
-  // Pie chart
-  const ctx2 = document.getElementById('proxy-status-chart').getContext('2d');
-  new Chart(ctx2, {
-    type: 'doughnut',
-    data: {
-      labels: ['Active', 'Expired'],
-      datasets: [{ data: [data.proxies.active, data.proxies.expired],
-        backgroundColor: ['#10b981','#ef4444'], borderWidth: 0 }]
-    },
-    options: { plugins: { legend: { labels: { color: '#e2e8f0' } } }, cutout: '65%' }
-  });
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────────────────────────────────────
+async function doLogin() {
+    const pwd = document.getElementById('pwdInput').value;
+    const errEl = document.getElementById('loginErr');
+    errEl.textContent = '';
+    if (!pwd) { errEl.textContent = 'Entrez votre mot de passe.'; return; }
+    try {
+        const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd })
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = 'Mot de passe incorrect.'; return; }
+        TOKEN = data.token;
+        localStorage.setItem('adminToken', TOKEN);
+        initApp();
+    } catch { errEl.textContent = 'Erreur de connexion.'; }
 }
 
-// ── Revenue chart ──────────────────────────────────────────
-async function loadRevenueChart() {
-  const data = await apiFetch('/revenue-chart?days=30');
-  if (!data) return;
+function doLogout() {
+    apiFetch('/api/admin/logout', 'POST').catch(() => {});
+    TOKEN = null;
+    localStorage.removeItem('adminToken');
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('pwdInput').value = '';
+}
 
-  const labels   = data.map(d => d._id.slice(5));
-  const revenues = data.map(d => +d.revenue.toFixed(2));
-  const counts   = data.map(d => d.count);
+// ─────────────────────────────────────────────────────────────────────────────
+// API HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+async function apiFetch(url, method = 'GET', body = null) {
+    const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN || '' }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erreur API');
+    return data;
+}
 
-  const ctx = document.getElementById('revenue-chart').getContext('2d');
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Revenue ($)', data: revenues, backgroundColor: 'rgba(79,110,247,.7)', yAxisID: 'y' },
-        { label: 'Sales', data: counts, type: 'line', borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .4, yAxisID: 'y2' }
-      ]
-    },
-    options: {
-      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
-      scales: {
-        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: '#1a1e2e' } },
-        y:  { ticks: { color: '#64748b' }, grid: { color: '#1a1e2e' }, position: 'left'  },
-        y2: { ticks: { color: '#64748b' }, grid: { display: false },   position: 'right' }
-      }
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────────────────────────────────────
+function nav(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    document.getElementById('nav-' + page).classList.add('active');
+    currentPage = page;
+    if (page === 'dashboard') loadDashboard();
+    if (page === 'users') loadUsers();
+    if (page === 'topups') loadTopups();
+    if (page === 'support') loadSupport();
+    if (page === 'proxies') loadProxies();
+}
+
+function refreshCurrentPage() { nav(currentPage); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BADGES
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadBadges() {
+    try {
+        const data = await apiFetch('/api/admin/stats');
+        setBadge('badge-support', data.newSupport);
+        setBadge('badge-topups', data.pendingTopups);
+    } catch {}
+}
+function setBadge(id, count) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = count;
+    el.classList.toggle('show', count > 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+    try {
+        const d = await apiFetch('/api/admin/stats');
+        document.getElementById('statsGrid').innerHTML = `
+            ${statCard('👥','Utilisateurs', d.totalUsers, `+${d.newUsersWeek} cette semaine`)}
+            ${statCard('🌐','Proxies actifs', d.activeProxies, `${d.totalProxies} au total`)}
+            ${statCard('💰','Revenus total', '$' + d.totalRevenue.toFixed(2), 'Tous proxies confondus')}
+            ${statCard('⏳','Top-up en attente', d.pendingTopups, 'Demandes à traiter', d.pendingTopups > 0 ? 'color:var(--yellow)' : '')}
+            ${statCard('💬','Nouveaux msgs', d.newSupport, 'Support non lu', d.newSupport > 0 ? 'color:var(--red)' : '')}
+        `;
+
+        // Recent users table
+        const rut = document.getElementById('recentUsersTable');
+        if (!d.recentUsers?.length) { rut.innerHTML = `<tr><td class="loader">Aucun utilisateur</td></tr>`; }
+        else {
+            rut.innerHTML = `<thead><tr><th>Email</th><th>Balance</th><th>Inscrit</th></tr></thead><tbody>` +
+                d.recentUsers.map(u => `<tr>
+                    <td class="mono">${u.email || '<span style="color:var(--muted)">—</span>'}</td>
+                    <td><span style="color:var(--green);font-weight:700">$${(u.balance||0).toFixed(2)}</span></td>
+                    <td style="color:var(--muted);font-size:.78rem">${fmtDate(u.createdAt)}</td>
+                </tr>`).join('') + '</tbody>';
+        }
+
+        // Recent proxies table
+        const rpt = document.getElementById('recentProxiesTable');
+        if (!d.recentProxies?.length) { rpt.innerHTML = `<tr><td class="loader">Aucun proxy</td></tr>`; }
+        else {
+            rpt.innerHTML = `<thead><tr><th>IP</th><th>Pays</th><th>Prix</th><th>Statut</th></tr></thead><tbody>` +
+                d.recentProxies.map(p => `<tr>
+                    <td class="mono">${p.ip}:${p.port}</td>
+                    <td>${p.country || '—'}</td>
+                    <td style="color:var(--green)">$${p.price.toFixed(2)}</td>
+                    <td>${statusPill(p.status)}</td>
+                </tr>`).join('') + '</tbody>';
+        }
+    } catch (e) {
+        document.getElementById('statsGrid').innerHTML = `<div style="color:var(--red)">${e.message}</div>`;
     }
-  });
 }
 
-// ── Users ──────────────────────────────────────────────────
-let userSearchTimer;
-document.getElementById('user-search').addEventListener('input', () => {
-  clearTimeout(userSearchTimer);
-  userSearchTimer = setTimeout(() => { pages.users = 1; loadUsers(); }, 400);
-});
-
-async function loadUsers() {
-  const search = document.getElementById('user-search').value.trim();
-  const qs = `?page=${pages.users}&limit=20${search ? `&search=${encodeURIComponent(search)}` : ''}`;
-  const data = await apiFetch(`/users${qs}`);
-  if (!data) return;
-
-  const body = data.users.length
-    ? `<table>
-        <thead><tr>
-          <th>Email</th><th>Facebook Name</th><th>PSID</th>
-          <th>Proxies</th><th>Spent</th><th>Status</th><th>Joined</th>
-        </tr></thead>
-        <tbody>${data.users.map(u => `
-          <tr>
-            <td>${u.email || '<span style="color:var(--muted)">—</span>'}</td>
-            <td>${u.facebookName || '—'}</td>
-            <td style="font-size:.7rem;color:var(--muted)">${u.psid}</td>
-            <td>${u.proxiesCount}</td>
-            <td>$${u.totalSpent}</td>
-            <td>${u.isLoggedIn ? '<span class="badge green">Logged In</span>' : '<span class="badge gray">Logged Out</span>'}</td>
-            <td style="color:var(--muted)">${fmtDate(u.createdAt)}</td>
-          </tr>`).join('')}
-        </tbody>
-       </table>`
-    : '<div class="loading">No users found</div>';
-
-  document.getElementById('users-table-body').innerHTML = body;
-  renderPagination('users-pagination', pages.users, data.pages, (p) => { pages.users = p; loadUsers(); });
+function statCard(icon, label, val, sub, style='') {
+    return `<div class="stat-card">
+        <div class="stat-label">${label}</div>
+        <div class="stat-val" style="${style}">${val}</div>
+        <div class="stat-sub">${sub}</div>
+        <div class="stat-icon">${icon}</div>
+    </div>`;
 }
 
-// ── Proxies ────────────────────────────────────────────────
-document.getElementById('proxy-filter').addEventListener('change', () => { pages.proxies = 1; loadProxies(); });
-
-async function loadProxies() {
-  const status = document.getElementById('proxy-filter').value;
-  const qs = `?page=${pages.proxies}&limit=20${status ? `&status=${status}` : ''}`;
-  const data = await apiFetch(`/proxies${qs}`);
-  if (!data) return;
-
-  const body = data.proxies.length
-    ? `<table>
-        <thead><tr>
-          <th>IP:Port</th><th>Protocol</th><th>Country</th>
-          <th>Duration</th><th>Price</th><th>Status</th><th>User</th><th>Purchased</th>
-        </tr></thead>
-        <tbody>${data.proxies.map(p => `
-          <tr>
-            <td style="font-family:monospace;font-size:.7rem">${p.ip}:${p.port}</td>
-            <td>${p.protocol?.toUpperCase()}</td>
-            <td>${p.country || '—'}</td>
-            <td>${p.packageLabel || (p.duration + 'd')}</td>
-            <td>$${p.price || 0}</td>
-            <td>${statusBadge(p.status)}</td>
-            <td style="font-size:.7rem">${p.userId?.email || p.psid?.slice(-6)}</td>
-            <td style="color:var(--muted);font-size:.75rem">${fmtDate(p.purchasedAt)}</td>
-          </tr>`).join('')}
-        </tbody>
-       </table>`
-    : '<div class="loading">No proxies</div>';
-
-  document.getElementById('proxies-table-body').innerHTML = body;
-  renderPagination('proxies-pagination', pages.proxies, data.pages, (p) => { pages.proxies = p; loadProxies(); });
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadUsers(page = usersCurrentPage) {
+    usersCurrentPage = page;
+    const search = document.getElementById('userSearch')?.value || '';
+    const tbody = document.getElementById('usersBody');
+    tbody.innerHTML = `<tr><td colspan="6" class="loader"><div class="spinner"></div></td></tr>`;
+    try {
+        const d = await apiFetch(`/api/admin/users?search=${encodeURIComponent(search)}&page=${page}&limit=15`);
+        if (!d.users.length) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><div class="empty-text">Aucun utilisateur trouvé</div></div></td></tr>`;
+        } else {
+            tbody.innerHTML = d.users.map(u => `<tr>
+                <td class="mono">${u.email || '<span style="color:var(--muted)">Non connecté</span>'}</td>
+                <td class="mono" style="font-size:.75rem;color:var(--muted)">${u.psid}</td>
+                <td><span style="color:var(--green);font-weight:700">$${(u.balance||0).toFixed(2)}</span></td>
+                <td>${u.isLoggedIn ? '<span class="pill pill-green">Connecté</span>' : '<span class="pill pill-gray">Hors ligne</span>'}</td>
+                <td style="color:var(--muted);font-size:.78rem">${fmtDate(u.createdAt)}</td>
+                <td style="display:flex;gap:.4rem;flex-wrap:wrap">
+                    <button class="btn btn-ghost" onclick="openBalanceModal('${u._id}','${u.email||'—'}',${u.balance||0})">💰</button>
+                    <button class="btn btn-ghost" onclick="openMsgModal('${u._id}','${u.email||u.psid}')">📣</button>
+                    <button class="btn btn-ghost" onclick="openUserDetail('${u._id}')">🔍</button>
+                </td>
+            </tr>`).join('');
+        }
+        renderPagination('usersPagination', page, d.pages, loadUsers);
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);text-align:center">${e.message}</td></tr>`;
+    }
 }
 
-// ── Support ────────────────────────────────────────────────
-document.getElementById('support-filter').addEventListener('change', () => { pages.support = 1; loadSupport(); });
-
-async function loadSupport() {
-  const status = document.getElementById('support-filter').value;
-  const qs = `?page=${pages.support}&limit=20${status ? `&status=${status}` : ''}`;
-  const data = await apiFetch(`/support${qs}`);
-  if (!data) return;
-
-  const body = data.messages.length
-    ? `<table>
-        <thead><tr><th>Email / PSID</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-        <tbody>${data.messages.map(m => `
-          <tr>
-            <td>${m.email || m.psid}</td>
-            <td style="max-width:200px;word-break:break-word;font-size:.75rem">${esc(m.message)}</td>
-            <td>${supportBadge(m.status)}</td>
-            <td style="color:var(--muted);font-size:.75rem">${fmtDate(m.createdAt)}</td>
-            <td style="font-size:.75rem">
-              ${m.status !== 'CLOSED' ? `<button onclick="updateSupport('${m._id}','CLOSED')"
-                style="background:var(--surface2);border:1px solid var(--border);color:var(--text);
-                       padding:3px 8px;border-radius:5px;cursor:pointer;font-size:.7rem;margin-bottom:2px;width:100%">Close</button>` : ''}
-              ${m.status === 'OPEN' ? `<button onclick="updateSupport('${m._id}','IN_PROGRESS')"
-                style="background:rgba(245,158,11,.15);border:1px solid var(--yellow);color:var(--yellow);
-                       padding:3px 8px;border-radius:5px;cursor:pointer;font-size:.7rem;width:100%">In Progress</button>` : ''}
-            </td>
-          </tr>`).join('')}
-        </tbody>
-       </table>`
-    : '<div class="loading">No tickets</div>';
-
-  document.getElementById('support-table-body').innerHTML = body;
-  renderPagination('support-pagination', pages.support, data.pages, (p) => { pages.support = p; loadSupport(); });
+// ─────────────────────────────────────────────────────────────────────────────
+// TOP-UP
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadTopups(page = topupsCurrentPage) {
+    topupsCurrentPage = page;
+    const status = document.getElementById('topupFilter')?.value || '';
+    const tbody = document.getElementById('topupsBody');
+    tbody.innerHTML = `<tr><td colspan="5" class="loader"><div class="spinner"></div></td></tr>`;
+    try {
+        const d = await apiFetch(`/api/admin/topups?status=${status}&page=${page}&limit=15`);
+        if (!d.requests.length) {
+            tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">💰</div><div class="empty-text">Aucune demande</div></div></td></tr>`;
+        } else {
+            tbody.innerHTML = d.requests.map(r => `<tr>
+                <td class="mono">${r.userId?.email || r.email}</td>
+                <td><span style="font-weight:700;color:var(--yellow)">$${r.amount.toFixed(2)}</span>${r.approvedAmount && r.approvedAmount !== r.amount ? ` <span style="color:var(--green);font-size:.75rem">→ $${r.approvedAmount.toFixed(2)}</span>` : ''}</td>
+                <td>${topupStatusPill(r.status)}</td>
+                <td style="color:var(--muted);font-size:.78rem">${fmtDate(r.createdAt)}</td>
+                <td>${r.status === 'PENDING'
+                    ? `<button class="btn btn-success" onclick="openTopupModal('${r._id}',${r.amount})">Traiter</button>`
+                    : `<span style="color:var(--muted);font-size:.78rem">${r.notes || '—'}</span>`}</td>
+            </tr>`).join('');
+        }
+        renderPagination('topupsPagination', page, d.pages, loadTopups);
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);text-align:center">${e.message}</td></tr>`;
+    }
 }
 
-async function updateSupport(id, status) {
-  await apiFetch(`/support/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-  loadSupport();
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPPORT
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadSupport(page = supportCurrentPage) {
+    supportCurrentPage = page;
+    const status = document.getElementById('supportFilter')?.value || '';
+    const tbody = document.getElementById('supportBody');
+    tbody.innerHTML = `<tr><td colspan="6" class="loader"><div class="spinner"></div></td></tr>`;
+    try {
+        const d = await apiFetch(`/api/admin/support?status=${status}&page=${page}&limit=15`);
+        if (!d.messages.length) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">💬</div><div class="empty-text">Aucun message</div></div></td></tr>`;
+        } else {
+            tbody.innerHTML = d.messages.map(m => `<tr>
+                <td class="mono" style="font-size:.8rem">${m.userId?.email || m.email}</td>
+                <td style="max-width:220px">
+                    <div style="font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.message}</div>
+                    ${m.adminReply ? `<div style="color:var(--green);font-size:.75rem;margin-top:.2rem">↩ ${m.adminReply.substring(0,60)}…</div>` : ''}
+                </td>
+                <td><span class="pill pill-blue">${m.category}</span></td>
+                <td>${supportStatusPill(m.status)}</td>
+                <td style="color:var(--muted);font-size:.78rem">${fmtDate(m.createdAt)}</td>
+                <td style="display:flex;gap:.4rem">
+                    <button class="btn btn-primary" onclick="openReplyModal('${m._id}',\`${escJs(m.message)}\`,\`${escJs(m.userId?.email||m.email)}\`)">💬 Répondre</button>
+                </td>
+            </tr>`).join('');
+        }
+        renderPagination('supportPagination', page, d.pages, loadSupport);
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);text-align:center">${e.message}</td></tr>`;
+    }
 }
 
-// ── Activity ───────────────────────────────────────────────
-async function loadActivity() {
-  const data = await apiFetch('/activity');
-  if (!data) return;
-
-  document.getElementById('activity-list').innerHTML = data.length
-    ? data.map(a => `
-        <div class="activity-item">
-          <div class="activity-dot ${a.type}"></div>
-          <div>
-            <div class="activity-label">${esc(a.label)}</div>
-            <div class="activity-meta">${a.user} · ${fmtDate(a.date)}</div>
-          </div>
-        </div>`).join('')
-    : '<div class="loading">No activity</div>';
+// ─────────────────────────────────────────────────────────────────────────────
+// PROXIES
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadProxies(page = proxiesCurrentPage) {
+    proxiesCurrentPage = page;
+    const status = document.getElementById('proxyFilter')?.value || '';
+    const tbody = document.getElementById('proxiesBody');
+    tbody.innerHTML = `<tr><td colspan="8" class="loader"><div class="spinner"></div></td></tr>`;
+    try {
+        const d = await apiFetch(`/api/admin/proxies?status=${status}&page=${page}&limit=15`);
+        if (!d.proxies.length) {
+            tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🌐</div><div class="empty-text">Aucun proxy</div></div></td></tr>`;
+        } else {
+            tbody.innerHTML = d.proxies.map(p => `<tr>
+                <td class="mono" style="font-size:.78rem">${p.userId?.email || '—'}</td>
+                <td class="mono">${p.ip}:${p.port}</td>
+                <td><span class="pill pill-blue">${p.protocol.toUpperCase()}</span></td>
+                <td>${p.country || '—'}</td>
+                <td>${p.package === 'GOLDEN' ? '🥇' : '🥈'} ${p.package}</td>
+                <td style="color:var(--green);font-weight:700">$${p.price.toFixed(2)}</td>
+                <td style="font-size:.78rem;color:${new Date(p.expiresAt) < new Date() ? 'var(--red)' : 'var(--muted)'}">${fmtDate(p.expiresAt)}</td>
+                <td>${statusPill(p.status)}</td>
+            </tr>`).join('');
+        }
+        renderPagination('proxiesPagination', page, d.pages, loadProxies);
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);text-align:center">${e.message}</td></tr>`;
+    }
 }
 
-// ── Top-ups ────────────────────────────────────────────────
-document.getElementById('topup-filter').addEventListener('change', () => { pages.topups = 1; loadTopups(); });
-
-async function loadTopups() {
-  const status = document.getElementById('topup-filter').value;
-  const qs = `?page=${pages.topups}&limit=20${status ? `&status=${encodeURIComponent(status)}` : ''}`;
-  const data = await apiFetch(`/topups${qs}`);
-  if (!data) return;
-  const body = data.topups.length
-    ? `<table><thead><tr><th>Email</th><th>Amount</th><th>Balance</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>
-       ${data.topups.map(t => `<tr>
-        <td>${esc(t.userId?.email || t.email || t.psid)}</td>
-        <td><strong style="color:var(--green)">$${(+t.amount).toFixed(2)}</strong></td>
-        <td>$${(+(t.userId?.balance || 0)).toFixed(2)}</td>
-        <td>${topupBadge(t.status)}</td>
-        <td style="color:var(--muted);font-size:.75rem">${fmtDate(t.createdAt)}</td>
-        <td style="font-size:.75rem">${t.status === 'PENDING'
-          ? `<button onclick="processTopup('${t._id}','APPROVED')" style="background:rgba(16,185,129,.15);border:1px solid var(--green);color:var(--green);padding:3px 6px;border-radius:5px;cursor:pointer;font-size:.65rem;margin-right:2px;font-weight:600;width:100%;margin-bottom:2px">✅ Approve</button>
-             <button onclick="processTopup('${t._id}','REJECTED')" style="background:rgba(239,68,68,.1);border:1px solid var(--red);color:var(--red);padding:3px 6px;border-radius:5px;cursor:pointer;font-size:.65rem;font-weight:600;width:100%">❌ Reject</button>`
-          : '<span style="color:var(--muted);font-size:.75rem">—</span>'}</td>
-       </tr>`).join('')}
-       </tbody></table>`
-    : '<div class="loading">No requests</div>';
-  document.getElementById('topups-table-body').innerHTML = body;
-  renderPagination('topups-pagination', pages.topups, data.pages, (p) => { pages.topups = p; loadTopups(); });
+// ─────────────────────────────────────────────────────────────────────────────
+// MODALS
+// ─────────────────────────────────────────────────────────────────────────────
+function openBalanceModal(userId, email, balance) {
+    _modal.balanceUserId = userId;
+    document.getElementById('balanceUserInfo').innerHTML = `<div class="user-profile">
+        <div class="user-avatar">${email[0]?.toUpperCase() || '?'}</div>
+        <div class="user-meta"><h3>${email}</h3><p>Balance actuelle: <strong style="color:var(--green)">$${balance.toFixed(2)}</strong></p></div>
+    </div>`;
+    document.getElementById('balanceAmount').value = '';
+    document.getElementById('balanceAction').value = 'add';
+    document.getElementById('balanceModal').style.display = 'flex';
 }
 
-async function processTopup(id, status) {
-  if (!confirm(`${status === 'APPROVED' ? '✅ Approve' : '❌ Reject'} this top-up?`)) return;
-  const result = await apiFetch(`/topups/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-  if (result) { loadTopups(); loadStats(); }
+async function saveBalance() {
+    const amount = parseFloat(document.getElementById('balanceAmount').value);
+    const action = document.getElementById('balanceAction').value;
+    if (isNaN(amount) || amount < 0) { toast('Montant invalide', 'err'); return; }
+    try {
+        const d = await apiFetch(`/api/admin/users/${_modal.balanceUserId}/balance`, 'PATCH', { amount, action });
+        toast(`Balance mise à jour → $${d.balance.toFixed(2)} ✅`, 'ok');
+        closeModal('balanceModal');
+        if (currentPage === 'users') loadUsers();
+        if (currentPage === 'dashboard') loadDashboard();
+    } catch (e) { toast(e.message, 'err'); }
 }
 
-function topupBadge(s) {
-  const m = { PENDING: 'yellow', APPROVED: 'green', REJECTED: 'red' };
-  const l = { PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected' };
-  return `<span class="badge ${m[s]||'gray'}">${l[s]||s}</span>`;
+function openMsgModal(userId, email) {
+    _modal.msgUserId = userId;
+    document.getElementById('msgUserInfo').innerHTML = `<div style="font-size:.85rem;color:var(--muted)">Envoyer un message à: <strong style="color:var(--text)">${email}</strong></div>`;
+    document.getElementById('msgText').value = '';
+    document.getElementById('msgModal').style.display = 'flex';
 }
 
-async function apiFetch(path, opts = {}) {
-  try {
-    const res = await fetch(API(path), { headers: headers(), ...opts });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  } catch (err) {
-    console.error('API error:', err);
-    return null;
-  }
+async function sendDirectMessage() {
+    const message = document.getElementById('msgText').value.trim();
+    if (!message) { toast('Message vide', 'err'); return; }
+    try {
+        await apiFetch(`/api/admin/users/${_modal.msgUserId}/message`, 'POST', { message });
+        toast('Message envoyé sur Messenger ✅', 'ok');
+        closeModal('msgModal');
+    } catch (e) { toast(e.message, 'err'); }
 }
 
-function renderPagination(containerId, current, total, onPage) {
-  const c = document.getElementById(containerId);
-  if (total <= 1) { c.innerHTML = ''; return; }
-  c.innerHTML = `
-    <button ${current <= 1 ? 'disabled' : ''} onclick="(${onPage.toString()})(${current - 1})">← Prev</button>
-    <span class="info">Page ${current} / ${total}</span>
-    <button ${current >= total ? 'disabled' : ''} onclick="(${onPage.toString()})(${current + 1})">Next →</button>
-  `;
+function openReplyModal(msgId, message, email) {
+    _modal.replyMsgId = msgId;
+    document.getElementById('replyMsgPreview').innerHTML =
+        `<div style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">💬 De: <strong>${email}</strong></div>` +
+        `<div>${message}</div>`;
+    document.getElementById('replyText').value = '';
+    document.getElementById('replyModal').style.display = 'flex';
+}
+
+async function sendReply() {
+    const reply = document.getElementById('replyText').value.trim();
+    if (!reply) { toast('Réponse vide', 'err'); return; }
+    try {
+        await apiFetch(`/api/admin/support/${_modal.replyMsgId}/reply`, 'PATCH', { reply });
+        toast('Réponse envoyée sur Messenger ✅', 'ok');
+        closeModal('replyModal');
+        loadSupport();
+        loadBadges();
+    } catch (e) { toast(e.message, 'err'); }
+}
+
+function openTopupModal(id, amount) {
+    _modal.topupId = id;
+    document.getElementById('topupAmount').value = amount.toFixed(2);
+    document.getElementById('topupNote').value = '';
+    document.getElementById('topupInfo').innerHTML =
+        `<div style="font-size:.85rem;color:var(--muted)">Montant demandé: <strong style="color:var(--yellow)">$${amount.toFixed(2)}</strong></div>`;
+    document.getElementById('topupModal').style.display = 'flex';
+}
+
+async function processTopup(action) {
+    const amount = parseFloat(document.getElementById('topupAmount').value);
+    const notes = document.getElementById('topupNote').value.trim();
+    try {
+        if (action === 'approve') {
+            if (isNaN(amount) || amount <= 0) { toast('Montant invalide', 'err'); return; }
+            await apiFetch(`/api/admin/topups/${_modal.topupId}/approve`, 'PATCH', { amount, notes });
+            toast('Top-up approuvé ✅ — Utilisateur notifié', 'ok');
+        } else {
+            await apiFetch(`/api/admin/topups/${_modal.topupId}/reject`, 'PATCH', { notes });
+            toast('Top-up rejeté — Utilisateur notifié', 'ok');
+        }
+        closeModal('topupModal');
+        loadTopups();
+        loadBadges();
+    } catch (e) { toast(e.message, 'err'); }
+}
+
+async function openUserDetail(userId) {
+    document.getElementById('userDetailBody').innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+    document.getElementById('userDetailModal').style.display = 'flex';
+    try {
+        const d = await apiFetch(`/api/admin/users/${userId}`);
+        const u = d.user;
+        document.getElementById('userDetailBody').innerHTML = `
+            <div class="user-profile">
+                <div class="user-avatar">${(u.email||'?')[0].toUpperCase()}</div>
+                <div class="user-meta">
+                    <h3>${u.email || 'Pas de compte'}</h3>
+                    <p>PSID: ${u.psid} · Balance: <strong style="color:var(--green)">$${(u.balance||0).toFixed(2)}</strong></p>
+                </div>
+            </div>
+            <div class="grid2" style="margin-bottom:1rem">
+                <div style="background:var(--panel2);border-radius:8px;padding:.8rem">
+                    <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">PROXIES</div>
+                    <div style="font-size:1.3rem;font-weight:800">${d.proxies.length}</div>
+                    <div style="font-size:.75rem;color:var(--green)">${d.proxies.filter(p=>p.status==='ACTIVE').length} actifs</div>
+                </div>
+                <div style="background:var(--panel2);border-radius:8px;padding:.8rem">
+                    <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">TOP-UPS</div>
+                    <div style="font-size:1.3rem;font-weight:800">${d.topups.length}</div>
+                    <div style="font-size:.75rem;color:var(--yellow)">${d.topups.filter(t=>t.status==='PENDING').length} en attente</div>
+                </div>
+            </div>
+            ${d.proxies.length ? `
+            <div style="font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:.4rem">Proxies récents</div>
+            <div style="overflow-x:auto"><table><thead><tr><th>IP:Port</th><th>Pays</th><th>Expire</th><th>Statut</th></tr></thead><tbody>
+                ${d.proxies.slice(0,5).map(p=>`<tr>
+                    <td class="mono">${p.ip}:${p.port}</td>
+                    <td>${p.country||'—'}</td>
+                    <td style="font-size:.78rem;color:var(--muted)">${fmtDate(p.expiresAt)}</td>
+                    <td>${statusPill(p.status)}</td>
+                </tr>`).join('')}
+            </tbody></table></div>` : ''}
+        `;
+    } catch (e) {
+        document.getElementById('userDetailBody').innerHTML = `<div style="color:var(--red)">${e.message}</div>`;
+    }
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function renderPagination(containerId, current, total, fn) {
+    const el = document.getElementById(containerId);
+    if (total <= 1) { el.innerHTML = ''; return; }
+    let html = '<div class="pagination">';
+    html += `<button class="page-btn" onclick="${fn.name}(${current-1})" ${current<=1?'disabled':''}>‹</button>`;
+    for (let i=1; i<=total; i++) {
+        if (total > 7 && i > 2 && i < total - 1 && Math.abs(i - current) > 1) {
+            if (i === 3 || i === total - 2) html += '<span style="padding:.3rem">…</span>';
+            continue;
+        }
+        html += `<button class="page-btn ${i===current?'active':''}" onclick="${fn.name}(${i})">${i}</button>`;
+    }
+    html += `<button class="page-btn" onclick="${fn.name}(${current+1})" ${current>=total?'disabled':''}>›</button>`;
+    html += '</div>';
+    el.innerHTML = html;
 }
 
 function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+    if (!d) return '—';
+    return new Date(d).toLocaleString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
-function statusBadge(s) {
-  const map = { ACTIVE: 'green', EXPIRED: 'red', SUSPENDED: 'yellow' };
-  return `<span class="badge ${map[s] || 'gray'}">${s}</span>`;
+
+function statusPill(s) {
+    const m = { ACTIVE:'pill-green', EXPIRED:'pill-red', SUSPENDED:'pill-yellow' };
+    const icons = { ACTIVE:'🟢', EXPIRED:'🔴', SUSPENDED:'⚠️' };
+    return `<span class="pill ${m[s]||'pill-gray'}">${icons[s]||''} ${s}</span>`;
 }
-function supportBadge(s) {
-  const map = { OPEN: 'blue', IN_PROGRESS: 'yellow', CLOSED: 'gray' };
-  const labels = { OPEN: 'Open', IN_PROGRESS: 'In Progress', CLOSED: 'Closed' };
-  return `<span class="badge ${map[s] || 'gray'}">${labels[s] || s}</span>`;
+function topupStatusPill(s) {
+    const m = { PENDING:'pill-yellow', APPROVED:'pill-green', REJECTED:'pill-red' };
+    return `<span class="pill ${m[s]||'pill-gray'}">${s}</span>`;
 }
-function esc(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function supportStatusPill(s) {
+    const m = { NEW:'pill-red', READING:'pill-yellow', REPLIED:'pill-green' };
+    return `<span class="pill ${m[s]||'pill-gray'}">${s}</span>`;
+}
+
+let _debTimers = {};
+function debounce(fn, ms) {
+    return (...args) => {
+        clearTimeout(_debTimers[fn.name]);
+        _debTimers[fn.name] = setTimeout(() => fn(...args), ms);
+    };
+}
+
+function escJs(str) {
+    return (str||'').replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');
+}
+
+let _toastTimer;
+function toast(msg, type='ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show ' + type;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { el.className = ''; }, 3500);
 }
 </script>
 </body>
