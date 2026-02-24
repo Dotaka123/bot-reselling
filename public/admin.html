@@ -334,6 +334,8 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <span class="icon">💰</span><span>Top-up</span>
         <span class="nav-badge" id="badge-topups">0</span>
       </button>
+      <div class="nav-section">Broadcast</div>
+      <a class="nav-item" onclick="openBroadcast()">📢 Send to All Users</a>
       <div class="nav-section">Support</div>
       <button class="nav-item" onclick="nav('support')" id="nav-support">
         <span class="icon">💬</span><span>Messages</span>
@@ -563,6 +565,23 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
 </div>
 
 <!-- MODAL: Topup approve -->
+<div class="modal-overlay" id="broadcastModal" style="display:none" onclick="if(event.target===this)closeModal('broadcastModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">📢 Broadcast to All Users</span>
+      <button class="modal-close" onclick="closeModal('broadcastModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 .8rem;color:var(--muted);font-size:.85rem">This will send a Messenger message to every registered user.</p>
+      <label class="form-label">Message</label>
+      <textarea class="form-input" id="broadcastText" rows="5" placeholder="Write your announcement here…" style="resize:vertical"></textarea>
+      <div id="broadcastResult" style="margin-top:.8rem;font-size:.85rem;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('broadcastModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="sendBroadcast()">📢 Send to All</button>
+    </div>
+  </div>
 <div class="modal-overlay" id="topupModal" style="display:none" onclick="if(event.target===this)closeModal('topupModal')">
   <div class="modal">
     <div class="modal-header">
@@ -1033,7 +1052,39 @@ function closeModal(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
+// BROADCAST
+// ─────────────────────────────────────────────────────────────────────────────
+function openBroadcast() {
+    document.getElementById('broadcastText').value = '';
+    const res = document.getElementById('broadcastResult');
+    res.style.display = 'none';
+    res.textContent = '';
+    document.getElementById('broadcastModal').style.display = 'flex';
+}
+
+async function sendBroadcast() {
+    const message = document.getElementById('broadcastText').value.trim();
+    if (!message) { alert('Please write a message first.'); return; }
+
+    const confirmed = confirm(`Send this message to ALL users?\n\n"${message.substring(0, 120)}${message.length > 120 ? '…' : ''}"`);
+    if (!confirmed) return;
+
+    const res = document.getElementById('broadcastResult');
+    res.style.display = 'block';
+    res.style.color = 'var(--muted)';
+    res.textContent = '⏳ Sending…';
+
+    try {
+        const data = await api('/broadcast', 'POST', { message });
+        res.style.color = 'var(--success, #22c55e)';
+        res.textContent = `✅ Done! Sent: ${data.sent} | Failed: ${data.failed} | Total users: ${data.total}`;
+    } catch (e) {
+        res.style.color = 'var(--danger, #ef4444)';
+        res.textContent = '❌ Error: ' + e.message;
+    }
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 function renderPagination(containerId, current, total, fn) {
     const el = document.getElementById(containerId);
