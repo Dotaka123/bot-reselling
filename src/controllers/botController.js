@@ -865,7 +865,11 @@ async function handleTopUp(user, psid, input, rawMessage) {
     const msg = (rawMessage || '').trim();
     if (msg.length < 3) return await sendText(psid, '❌ Message too short. Please include the amount and transaction ID.\n\n(0 = Back)');
     try {
-        await TopUpRequest.create({ userId: user._id, psid, email: user.email, amount: 0, notes: msg });
+        // Try to parse amount from message (e.g. "1$", "$1", "1.5")
+        const amountMatch = msg.match(/\$?\s*(\d+(?:[.,]\d+)?)\s*\$?/);
+        const parsedAmount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : 0.01;
+        const amount = parsedAmount > 0 ? parsedAmount : 0.01;
+        await TopUpRequest.create({ userId: user._id, psid, email: user.email, amount, notes: msg });
         await sendText(psid,
             `✅ TOP-UP REQUEST SENT!\n\n` +
             `👨‍💼 An admin will verify your payment and credit your balance shortly.\n\n` +
