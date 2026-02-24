@@ -9,6 +9,44 @@ const TopUpRequest   = require('../models/TopUpRequest');
 const PAGE_SIZE = 8;
 const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://www.facebook.com/yourpage';
 
+// ── CUSTOM PRICES (match your website) ───────────────────────────────────────
+// Format: { packageId: { 'label from API': price_in_USD } }
+// Labels used by the reseller API (French): '2 heures', '12 heures', '1 jour',
+//   '2 jours', '3 jours', '7 jours', '15 jours', '30 jours'
+const CUSTOM_PRICES = {
+    '1': { // Golden Package
+        '2 heures':  0.30,
+        '12 heures': 0.60,
+        '3 jours':   2.50,
+        '7 jours':   4.50,
+        '15 jours':  10.00,
+        '30 jours':  18.00,
+    },
+    '2': { // Silver Package
+        '2 jours':   1.50,
+        '7 jours':   4.00,
+        '30 jours':  12.00,
+    }
+};
+
+/**
+ * Overrides API prices with our custom prices.
+ * Falls back to API price if no custom price defined for that label/duration.
+ */
+function applyCustomPrices(prices) {
+    const result = {};
+    for (const [pkgId, priceList] of Object.entries(prices)) {
+        const customMap = CUSTOM_PRICES[pkgId] || {};
+        result[pkgId] = priceList.map(p => {
+            const override = p.label && customMap[p.label] !== undefined
+                ? customMap[p.label]
+                : null;
+            return override !== null ? { ...p, price: override } : p;
+        });
+    }
+    return result;
+}
+
 // States where "9" = next page, NOT main menu
 const PAGINATED_STATES = ['BUY_COUNTRY', 'BUY_CITY', 'BUY_PROVIDER', 'BUY_PARENT'];
 
@@ -256,7 +294,8 @@ async function handleMainMenu(user, psid, input) {
         case 1: {
             try {
                 // Load prices via the SINGLE reseller token (not user's)
-                const prices = await proxyApi.getPrices();
+                const rawPrices = await proxyApi.getPrices();
+                const prices = applyCustomPrices(rawPrices);
                 const packages = Object.keys(prices).map(pkgId => ({
                     id:   pkgId,
                     name: pkgId === '1' ? '🥇 Golden (Mobile)' : pkgId === '2' ? '🥈 Silver (Mobile)' : `Package ${pkgId}`
