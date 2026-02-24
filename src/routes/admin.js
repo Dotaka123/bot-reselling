@@ -1,194 +1,326 @@
-const express      = require('express');
-const router       = express.Router();
-const User         = require('../models/User');
-const Proxy        = require('../models/Proxy');
-const Support      = require('../models/SupportMessage');
-const TopUpRequest = require('../models/TopUpRequest');
-const proxyApiService = require('../services/proxyApiService');
-const { sendText } = require('../utils/messenger');
-const M            = require('../utils/messages');
+/**
+ * admin.js — Admin Panel API Routes
+ * Protected by ADMIN_PASSWORD env variable + JWT session token
+ */
+const express  = require('express');
+const router   = express.Router();
+const crypto   = require('crypto');
+const User     = require('../models/User');
+const Proxy    = require('../models/Proxy');
+const SupportMessage = require('../models/SupportMessage');
+const TopUpRequest   = require('../models/TopUpRequest');
+const { sendText }   = require('../utils/messenger');
 
-function requireAdminToken(req, res, next) {
-  const token = req.headers['x-admin-token'] || req.query.token;
-  if (!token || token !== process.env.ADMIN_SECRET_TOKEN) return res.status(401).json({ error: 'Non autorisé' });
-  next();
+// ── Simple token store (in-memory, resets on restart) ──────────────────────
+const SESSIONS = new Set();
+
+function genToken() {
+    return crypto.randomBytes(32).toString('hex');
 }
-router.use(requireAdminToken);
 
-// Stats globales
-router.get('/stats', async (req, res) => {
-  try {
-    const [totalUsers, registeredUsers, activeUsers, totalProxies, activeProxies,
-           expiredProxies, openTickets, pendingTopUps, allProxies, apiBalance] = await Promise.all([
-      User.countDocuments(),
-      User.countDocuments({ isRegistered: true }),
-      User.countDocuments({ isLoggedIn: true }),
-      Proxy.countDocuments(),
-      Proxy.countDocuments({ status: 'ACTIF' }),
-      Proxy.countDocuments({ status: 'EXPIRÉ' }),
-      Support.countDocuments({ status: 'OPEN' }),
-      TopUpRequest.countDocuments({ status: 'PENDING' }),
-      Proxy.find({}, 'price purchasedAt').lean(),
-      proxyApiService.getBalance().catch(() => ({ balance: null }))
-    ]);
-
-    const totalRevenue = allProxies.reduce((s, p) => s + (p.price || 0), 0);
-    const mStart = new Date(); mStart.setDate(1); mStart.setHours(0, 0, 0, 0);
-    const monthRevenue = allProxies.filter(p => new Date(p.purchasedAt) >= mStart)
-                                   .reduce((s, p) => s + (p.price || 0), 0);
-
-    res.json({
-      users:        { total: totalUsers, registered: registeredUsers, active: activeUsers },
-      proxies:      { total: totalProxies, active: activeProxies, expired: expiredProxies },
-      revenue:      { total: +totalRevenue.toFixed(2), thisMonth: +monthRevenue.toFixed(2) },
-      support:      { openTickets },
-      topups:       { pending: pendingTopUps },
-      apiBalance:   apiBalance.balance
-    });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Users
-router.get('/users', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page || 1);
-    const limit = parseInt(req.query.limit || 20);
-    const search = req.query.search || '';
-    const filter = search
-      ? { $or: [{ email: { $regex: search, $options: 'i' } }, { facebookName: { $regex: search, $options: 'i' } }] }
-      : {};
-    const [users, total] = await Promise.all([
-      User.find(filter, '-password -stateData').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-      User.countDocuments(filter)
-    ]);
-    const userIds = users.map(u => u._id);
-    const proxiesByUser = await Proxy.aggregate([
-      { $match: { userId: { $in: userIds } } },
-      { $group: { _id: '$userId', count: { $sum: 1 }, spent: { $sum: '$price' } } }
-    ]);
-    const pm = {};
-    proxiesByUser.forEach(p => { pm[p._id.toString()] = p; });
-    const enriched = users.map(u => ({
-      ...u,
-      proxiesCount: pm[u._id.toString()]?.count || 0,
-      totalSpent: +(pm[u._id.toString()]?.spent || 0).toFixed(2)
-    }));
-    res.json({ users: enriched, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Proxies
-router.get('/proxies', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page || 1);
-    const limit = parseInt(req.query.limit || 20);
-    const status = req.query.status || '';
-    const filter = status ? { status } : {};
-    const [proxies, total] = await Promise.all([
-      Proxy.find(filter).populate('userId', 'email facebookName psid').sort({ purchasedAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-      Proxy.countDocuments(filter)
-    ]);
-    res.json({ proxies, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Support
-router.get('/support', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page || 1);
-    const limit = parseInt(req.query.limit || 20);
-    const status = req.query.status || '';
-    const filter = status ? { status } : {};
-    const [messages, total] = await Promise.all([
-      Support.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-      Support.countDocuments(filter)
-    ]);
-    res.json({ messages, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-router.patch('/support/:id', async (req, res) => {
-  try {
-    const msg = await Support.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-    res.json(msg);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Top-ups
-router.get('/topups', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page || 1);
-    const limit = parseInt(req.query.limit || 20);
-    const status = req.query.status || 'PENDING';
-    const filter = status ? { status } : {};
-    const [topups, total] = await Promise.all([
-      TopUpRequest.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit)
-        .populate('userId', 'email facebookName balance').lean(),
-      TopUpRequest.countDocuments(filter)
-    ]);
-    res.json({ topups, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Approuver / Rejeter un top-up
-router.patch('/topups/:id', async (req, res) => {
-  try {
-    const { status } = req.body; // APPROVED ou REJECTED
-    const topup = await TopUpRequest.findById(req.params.id).populate('userId');
-    if (!topup) return res.status(404).json({ error: 'Introuvable' });
-    if (topup.status !== 'PENDING') return res.status(400).json({ error: 'Demande déjà traitée' });
-
-    topup.status      = status;
-    topup.processedAt = new Date();
-    await topup.save();
-
-    if (status === 'APPROVED') {
-      // Crédite le wallet de l'utilisateur
-      const user = topup.userId;
-      user.balance = (user.balance || 0) + topup.amount;
-      await user.save();
-
-      // Notifie l'utilisateur via Messenger
-      try {
-        await sendText(user.psid, M.TOPUP_APPROVED(topup.amount, user.balance));
-      } catch (e) { console.warn('Notif Messenger échouée:', e.message); }
+function requireAuth(req, res, next) {
+    const auth = req.headers['x-admin-token'] || req.query.token;
+    if (!auth || !SESSIONS.has(auth)) {
+        return res.status(401).json({ error: 'Unauthorized' });
     }
+    next();
+}
 
-    res.json({ ok: true, status });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+// ── AUTH ───────────────────────────────────────────────────────────────────
+
+router.post('/login', (req, res) => {
+    const { password } = req.body;
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Wrong password' });
+    }
+    const token = genToken();
+    SESSIONS.add(token);
+    // Auto-expire after 8h
+    setTimeout(() => SESSIONS.delete(token), 8 * 60 * 60 * 1000);
+    res.json({ token });
 });
 
-// Revenue chart
-router.get('/revenue-chart', async (req, res) => {
-  try {
-    const days = parseInt(req.query.days || 30);
-    const from = new Date(); from.setDate(from.getDate() - days);
-    const data = await Proxy.aggregate([
-      { $match: { purchasedAt: { $gte: from } } },
-      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$purchasedAt' } }, revenue: { $sum: '$price' }, count: { $sum: 1 } } },
-      { $sort: { _id: 1 } }
-    ]);
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+router.post('/logout', requireAuth, (req, res) => {
+    const auth = req.headers['x-admin-token'];
+    SESSIONS.delete(auth);
+    res.json({ ok: true });
 });
 
-// Activity feed
-router.get('/activity', async (req, res) => {
-  try {
-    const [recentProxies, recentUsers, recentTickets, recentTopups] = await Promise.all([
-      Proxy.find().sort({ purchasedAt: -1 }).limit(8).populate('userId', 'email').lean(),
-      User.find({ isRegistered: true }).sort({ createdAt: -1 }).limit(4).lean(),
-      Support.find().sort({ createdAt: -1 }).limit(4).lean(),
-      TopUpRequest.find().sort({ createdAt: -1 }).limit(4).populate('userId', 'email').lean()
-    ]);
-    const activity = [
-      ...recentProxies.map(p => ({ type: 'purchase', date: p.purchasedAt, label: `Achat proxy ${p.country || ''} — $${p.price || 0}`, user: p.userId?.email || p.psid })),
-      ...recentUsers.map(u => ({ type: 'register', date: u.createdAt, label: 'Nouvel inscrit', user: u.email || u.facebookName })),
-      ...recentTickets.map(t => ({ type: 'support', date: t.createdAt, label: `Ticket: ${t.message.slice(0, 40)}...`, user: t.email || t.psid })),
-      ...recentTopups.map(t => ({ type: 'topup', date: t.createdAt, label: `Recharge $${t.amount} — ${t.status}`, user: t.userId?.email || t.psid }))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20);
-    res.json(activity);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+// ── DASHBOARD STATS ────────────────────────────────────────────────────────
+
+router.get('/stats', requireAuth, async (req, res) => {
+    try {
+        const [
+            totalUsers,
+            activeProxies,
+            totalProxies,
+            pendingTopups,
+            newSupport,
+            revenue,
+            recentUsers,
+            recentProxies
+        ] = await Promise.all([
+            User.countDocuments(),
+            Proxy.countDocuments({ status: 'ACTIVE' }),
+            Proxy.countDocuments(),
+            TopUpRequest.countDocuments({ status: 'PENDING' }),
+            SupportMessage.countDocuments({ status: 'NEW' }),
+            Proxy.aggregate([{ $group: { _id: null, total: { $sum: '$price' } } }]),
+            User.find().sort({ createdAt: -1 }).limit(5).select('email balance createdAt'),
+            Proxy.find().sort({ createdAt: -1 }).limit(5).populate('userId', 'email').select('ip port protocol country status price createdAt')
+        ]);
+
+        const totalRevenue = revenue[0]?.total || 0;
+
+        // Users created in last 7 days
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const newUsersWeek = await User.countDocuments({ createdAt: { $gte: weekAgo } });
+
+        res.json({
+            totalUsers, activeProxies, totalProxies,
+            pendingTopups, newSupport, totalRevenue,
+            newUsersWeek, recentUsers, recentProxies
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── USERS ──────────────────────────────────────────────────────────────────
+
+router.get('/users', requireAuth, async (req, res) => {
+    try {
+        const { search, page = 1, limit = 20 } = req.query;
+        const query = {};
+        if (search) {
+            query.$or = [
+                { email: { $regex: search, $options: 'i' } },
+                { psid: { $regex: search, $options: 'i' } }
+            ];
+        }
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const [users, total] = await Promise.all([
+            User.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit))
+                .select('-passwordHash -stateData'),
+            User.countDocuments(query)
+        ]);
+        res.json({ users, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/users/:id', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-passwordHash');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        const [proxies, topups, messages] = await Promise.all([
+            Proxy.find({ userId: user._id }).sort({ createdAt: -1 }),
+            TopUpRequest.find({ userId: user._id }).sort({ createdAt: -1 }),
+            SupportMessage.find({ userId: user._id }).sort({ createdAt: -1 })
+        ]);
+        res.json({ user, proxies, topups, messages });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/users/:id/balance', requireAuth, async (req, res) => {
+    try {
+        const { amount, action } = req.body; // action: 'add' | 'set'
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const val = parseFloat(amount);
+        if (isNaN(val) || val < 0) return res.status(400).json({ error: 'Invalid amount' });
+
+        if (action === 'set') {
+            user.balance = val;
+        } else {
+            user.balance = parseFloat(((user.balance || 0) + val).toFixed(4));
+        }
+        await user.save();
+
+        // Notify user on Messenger
+        await sendText(user.psid,
+            `💰 BALANCE UPDATE\n\n` +
+            `Your balance has been ${action === 'set' ? 'set to' : 'credited with'} $${val.toFixed(2)}.\n` +
+            `New balance: $${user.balance.toFixed(2)}\n\n` +
+            `Type anything to return to the menu.`
+        );
+
+        res.json({ balance: user.balance });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Send direct message to a user
+router.post('/users/:id/message', requireAuth, async (req, res) => {
+    try {
+        const { message } = req.body;
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!message?.trim()) return res.status(400).json({ error: 'Empty message' });
+
+        const ok = await sendText(user.psid, `📣 Admin message:\n\n${message.trim()}`);
+        res.json({ sent: ok });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── SUPPORT MESSAGES ───────────────────────────────────────────────────────
+
+router.get('/support', requireAuth, async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const query = status ? { status } : {};
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const [messages, total] = await Promise.all([
+            SupportMessage.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit))
+                .populate('userId', 'email psid balance'),
+            SupportMessage.countDocuments(query)
+        ]);
+        res.json({ messages, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/support/:id/reply', requireAuth, async (req, res) => {
+    try {
+        const { reply } = req.body;
+        if (!reply?.trim()) return res.status(400).json({ error: 'Empty reply' });
+
+        const msg = await SupportMessage.findById(req.params.id).populate('userId', 'psid email');
+        if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+        // Send via Messenger
+        const ok = await sendText(msg.psid,
+            `📬 SUPPORT REPLY\n\n` +
+            `Your message: "${msg.message.substring(0, 80)}${msg.message.length > 80 ? '...' : ''}"\n\n` +
+            `📣 Admin reply:\n${reply.trim()}\n\n` +
+            `Type anything to return to the menu.`
+        );
+
+        msg.status     = 'REPLIED';
+        msg.adminReply = reply.trim();
+        msg.repliedAt  = new Date();
+        await msg.save();
+
+        res.json({ sent: ok, message: msg });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/support/:id/status', requireAuth, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const msg = await SupportMessage.findByIdAndUpdate(
+            req.params.id, { status }, { new: true }
+        );
+        if (!msg) return res.status(404).json({ error: 'Not found' });
+        res.json(msg);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── TOP-UP REQUESTS ────────────────────────────────────────────────────────
+
+router.get('/topups', requireAuth, async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const query = status ? { status } : {};
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const [requests, total] = await Promise.all([
+            TopUpRequest.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit))
+                .populate('userId', 'email psid balance'),
+            TopUpRequest.countDocuments(query)
+        ]);
+        res.json({ requests, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/topups/:id/approve', requireAuth, async (req, res) => {
+    try {
+        const { amount, notes } = req.body;
+        const req_ = await TopUpRequest.findById(req.params.id).populate('userId');
+        if (!req_) return res.status(404).json({ error: 'Not found' });
+        if (req_.status !== 'PENDING') return res.status(400).json({ error: 'Already processed' });
+
+        const approved = parseFloat(amount) || req_.amount;
+        req_.status         = 'APPROVED';
+        req_.approvedAmount = approved;
+        req_.approvedAt     = new Date();
+        req_.notes          = notes || '';
+        await req_.save();
+
+        // Add balance to user
+        const user = req_.userId;
+        user.balance = parseFloat(((user.balance || 0) + approved).toFixed(4));
+        await user.save();
+
+        // Notify user
+        await sendText(user.psid,
+            `✅ TOP-UP APPROVED!\n\n` +
+            `💰 Amount credited: $${approved.toFixed(2)}\n` +
+            `💳 New balance: $${user.balance.toFixed(2)}\n\n` +
+            `Type anything to return to the menu.`
+        );
+
+        res.json({ ok: true, balance: user.balance });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/topups/:id/reject', requireAuth, async (req, res) => {
+    try {
+        const { notes } = req.body;
+        const req_ = await TopUpRequest.findById(req.params.id).populate('userId');
+        if (!req_) return res.status(404).json({ error: 'Not found' });
+        if (req_.status !== 'PENDING') return res.status(400).json({ error: 'Already processed' });
+
+        req_.status = 'REJECTED';
+        req_.notes  = notes || '';
+        req_.approvedAt = new Date();
+        await req_.save();
+
+        await sendText(req_.psid,
+            `❌ TOP-UP REJECTED\n\n` +
+            `Your request of $${req_.amount.toFixed(2)} was rejected.\n` +
+            (notes ? `Reason: ${notes}\n\n` : '\n') +
+            `Contact support if you have questions.`
+        );
+
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── PROXIES ────────────────────────────────────────────────────────────────
+
+router.get('/proxies', requireAuth, async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const query = status ? { status } : {};
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const [proxies, total] = await Promise.all([
+            Proxy.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit))
+                .populate('userId', 'email'),
+            Proxy.countDocuments(query)
+        ]);
+        res.json({ proxies, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;
