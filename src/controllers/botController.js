@@ -166,9 +166,6 @@ async function handleWelcome(user, psid) {
 
 async function handleFBVerification(user, psid, input) {
   const normalizedText = input.type === 'text' ? input.value.trim().toLowerCase() : '';
-
-  // Accept both parsed command and raw text fallback.
-  if ((input.type === 'command' && input.value === 'DONE') || normalizedText === 'done') {
     await sendText(psid, '✅ Done received! Access granted.');
     await user.updateOne({ isPageSubscriber: true });
     await userService.setState(user, 'WELCOME');
