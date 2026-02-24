@@ -1,77 +1,42 @@
-version: '3.9'
+version: '3.8'
 
 services:
-
-  # ── Bot Messenger ──────────────────────────
-  proxybot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: proxybot
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      # Facebook
-      - PAGE_ACCESS_TOKEN=${PAGE_ACCESS_TOKEN}
-      - VERIFY_TOKEN=${VERIFY_TOKEN}
-      - APP_SECRET=${APP_SECRET}
-      # MongoDB (pointe vers le service mongo ci-dessous)
-      - MONGODB_URI=mongodb://mongo:27017/proxybot
-      # API Reselling
-      - PROXY_API_BASE=${PROXY_API_BASE}
-      - PROXY_API_EMAIL=${PROXY_API_EMAIL}
-      - PROXY_API_PASSWORD=${PROXY_API_PASSWORD}
-      # Admin
-      - ADMIN_PSID=${ADMIN_PSID}
-      # Prix (optionnel — valeurs par défaut dans le code)
-      - PRICE_1_2H=${PRICE_1_2H:-0.35}
-      - PRICE_1_12H=${PRICE_1_12H:-0.80}
-      - PRICE_1_1D=${PRICE_1_1D:-1.50}
-      - PRICE_1_3D=${PRICE_1_3D:-3.50}
-      - PRICE_1_7D=${PRICE_1_7D:-7.00}
-      - PRICE_1_15D=${PRICE_1_15D:-13.00}
-      - PRICE_1_30D=${PRICE_1_30D:-24.00}
-      - PRICE_2_2D=${PRICE_2_2D:-2.00}
-      - PRICE_2_7D=${PRICE_2_7D:-5.50}
-      - PRICE_2_30D=${PRICE_2_30D:-15.00}
-    depends_on:
-      mongo:
-        condition: service_healthy
-    networks:
-      - proxybot-net
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-
-  # ── MongoDB local (pour test uniquement) ───
-  # ⚠️  Sur Back4App, utilisez MongoDB Atlas à la place
-  mongo:
-    image: mongo:7-jammy
+  mongodb:
+    image: mongo:6.0-alpine
     container_name: proxybot-mongo
-    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: proxybot
     networks:
-      - proxybot-net
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      - proxybot-network
+    restart: unless-stopped
 
-networks:
-  proxybot-net:
-    driver: bridge
+  proxybot:
+    build: .
+    container_name: proxybot-app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      MONGODB_URI: "mongodb://mongodb:27017/proxybot"
+      PAGE_ACCESS_TOKEN: ${PAGE_ACCESS_TOKEN}
+      VERIFY_TOKEN: ${VERIFY_TOKEN}
+      APP_SECRET: ${APP_SECRET}
+      FACEBOOK_PAGE_URL: ${FACEBOOK_PAGE_URL}
+      FACEBOOK_PAGE_ID: ${FACEBOOK_PAGE_ID}
+    depends_on:
+      - mongodb
+    networks:
+      - proxybot-network
+    restart: unless-stopped
 
 volumes:
-  mongo_data:
-    driver: local
+  mongodb_data:
+
+networks:
+  proxybot-network:
+    driver: bridge
