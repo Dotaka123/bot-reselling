@@ -1,95 +1,106 @@
-// Mock proxy API service - replace with real API calls when ready
+/**
+ * proxyApiService.js
+ *
+ * ONE reseller token for ALL calls.
+ * Bot users are local only (MongoDB). They never touch this API directly.
+ * All purchases go through the single reseller account.
+ */
+const axios = require('axios');
 
-async function getCountries() {
-    return [
-        { country_code: 'US', country_name: 'United States' },
-        { country_code: 'FR', country_name: 'France' },
-        { country_code: 'GB', country_name: 'United Kingdom' },
-        { country_code: 'DE', country_name: 'Germany' },
-        { country_code: 'JP', country_name: 'Japan' },
-        { country_code: 'CA', country_name: 'Canada' },
-        { country_code: 'AU', country_name: 'Australia' },
-        { country_code: 'BR', country_name: 'Brazil' },
-        { country_code: 'IN', country_name: 'India' },
-        { country_code: 'SG', country_name: 'Singapore' }
-    ];
+const BASE = process.env.RESELLER_API_URL || 'http://localhost:4000';
+
+let _token = null;
+let _tokenExpiry = 0;
+
+async function getToken() {
+    const now = Date.now() / 1000;
+    if (_token && _tokenExpiry > now + 300) return _token;
+
+    const email    = process.env.RESELLER_EMAIL;
+    const password = process.env.RESELLER_PASSWORD;
+
+    if (!email || !password) throw new Error('RESELLER_EMAIL and RESELLER_PASSWORD must be set in .env');
+
+    const res = await axios.post(`${BASE}/api/reseller/login`, { email, password }, { timeout: 10000 });
+    _token       = res.data.token;
+    // Reselling server issues JWT for 7 days
+    _tokenExpiry = now + 7 * 24 * 3600;
+    console.log('🔑 Reseller token refreshed');
+    return _token;
 }
 
-async function getCities(countryCode) {
-    const cities = {
-        'US': [
-            { city_code: 'NYC', city_name: 'New York' },
-            { city_code: 'LAX', city_name: 'Los Angeles' },
-            { city_code: 'CHI', city_name: 'Chicago' }
-        ],
-        'FR': [
-            { city_code: 'PAR', city_name: 'Paris' },
-            { city_code: 'LYN', city_name: 'Lyon' }
-        ],
-        'GB': [
-            { city_code: 'LON', city_name: 'London' },
-            { city_code: 'MAN', city_name: 'Manchester' }
-        ],
-        'DE': [
-            { city_code: 'BER', city_name: 'Berlin' },
-            { city_code: 'MUN', city_name: 'Munich' }
-        ],
-        'JP': [
-            { city_code: 'TYO', city_name: 'Tokyo' },
-            { city_code: 'OSA', city_name: 'Osaka' }
-        ],
-        'CA': [
-            { city_code: 'TOR', city_name: 'Toronto' },
-            { city_code: 'VAN', city_name: 'Vancouver' }
-        ],
-        'AU': [
-            { city_code: 'SYD', city_name: 'Sydney' },
-            { city_code: 'MEL', city_name: 'Melbourne' }
-        ],
-        'BR': [
-            { city_code: 'SAO', city_name: 'Sao Paulo' },
-            { city_code: 'RIO', city_name: 'Rio de Janeiro' }
-        ],
-        'IN': [
-            { city_code: 'MUM', city_name: 'Mumbai' },
-            { city_code: 'DEL', city_name: 'Delhi' }
-        ],
-        'SG': [
-            { city_code: 'SGP', city_name: 'Singapore' }
-        ]
+async function api(method, endpoint, data = null, params = null) {
+    const token = await getToken();
+    const cfg = {
+        method,
+        url: `${BASE}${endpoint}`,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        timeout: 15000
     };
-    return cities[countryCode] || [];
-}
+    if (data)   cfg.data   = data;
+    if (params) cfg.params = params;
 
-async function getProviders(countryCode, cityCode) {
-    return [
-        { service_provider_id: '1', service_provider_name: 'Provider 1 (4G)' },
-        { service_provider_id: '2', service_provider_name: 'Provider 2 (LTE)' },
-        { service_provider_id: '3', service_provider_name: 'Provider 3 (Mobile)' }
-    ];
-}
-
-async function getParents(countryCode, cityCode, providerId) {
-    return [
-        { parent_proxy_id: 'P1', ip: '192.168.1.1', http_port: 8080, socks_port: 1080, technology: '4G' },
-        { parent_proxy_id: 'P2', ip: '192.168.1.2', http_port: 8080, socks_port: 1080, technology: 'LTE' }
-    ];
-}
-
-async function purchaseProxy(params) {
-    // TODO: Replace with real API call
-    // Returns a mock proxy object on success
-    return {
-        success: true,
-        proxy: {
-            ip: '185.12.34.' + Math.floor(Math.random() * 255),
-            http_port: 8080,
-            socks_port: 1080,
-            username: 'user_' + Math.random().toString(36).substr(2, 8),
-            password: Math.random().toString(36).substr(2, 12),
-            expiresAt: new Date(Date.now() + params.durationHours * 3600 * 1000)
+    try {
+        return (await axios(cfg)).data;
+    } catch (err) {
+        // Token expired — force refresh and retry once
+        if (err.response?.status === 401) {
+            _token = null;
+            const newToken = await getToken();
+            cfg.headers.Authorization = `Bearer ${newToken}`;
+            return (await axios(cfg)).data;
         }
-    };
+        throw err;
+    }
 }
 
-module.exports = { getCountries, getCities, getProviders, getParents, purchaseProxy };
+// ── CATALOGUE ─────────────────────────────────────────────────────────────────
+
+/** Returns { "1": [{duration, label, price}, ...], "2": [...] } */
+async function getPrices() {
+    return api('GET', '/api/reseller/prices');
+}
+
+/** Returns [{ id, country_name }, ...] */
+async function getCountries(pkgId) {
+    return api('GET', '/api/reseller/countries', null, { pkg_id: pkgId });
+}
+
+/** Returns [{ id, country_id, city_name }, ...] */
+async function getCities(countryId, pkgId) {
+    return api('GET', '/api/reseller/cities', null, { country_id: countryId, pkg_id: pkgId });
+}
+
+/** Returns [{ id, city_name, service_provider_name }, ...] */
+async function getProviders(cityId, pkgId) {
+    return api('GET', '/api/reseller/service-providers', null, { city_id: cityId, pkg_id: pkgId });
+}
+
+/** Returns [{ id, http_port, socks_port, technology, is_available, status, usage, rotation_time }, ...] */
+async function getParents(pkgId, offset = 0, cityId = null, serviceProviderCityId = null) {
+    const params = { pkg_id: pkgId, offset };
+    if (cityId)                params.city_id                  = cityId;
+    if (serviceProviderCityId) params.service_provider_city_id = serviceProviderCityId;
+    const data = await api('GET', '/api/reseller/parent-proxies', null, params);
+    return Array.isArray(data) ? data : [];
+}
+
+// ── PURCHASE ──────────────────────────────────────────────────────────────────
+
+/**
+ * Buy a proxy using the reseller account.
+ * { parentProxyId, packageId, protocol, duration, username, password }
+ * Returns { success, proxy, price, balance, proxyRecord }
+ */
+async function buyProxy({ parentProxyId, packageId, protocol, duration, username, password }) {
+    return api('POST', '/api/reseller/buy-proxy', {
+        parent_proxy_id: parseInt(parentProxyId),
+        package_id:      parseInt(packageId),
+        protocol:        protocol === 'socks5' ? 'socks' : 'http',
+        duration:        parseFloat(duration),
+        username:        username.toLowerCase().trim(),
+        password:        password.toLowerCase().trim()
+    });
+}
+
+module.exports = { getPrices, getCountries, getCities, getProviders, getParents, buyProxy };
