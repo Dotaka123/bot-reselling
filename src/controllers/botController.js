@@ -168,7 +168,6 @@ async function handleFBVerification(user, psid, input) {
   const normalizedText = input.type === 'text' ? input.value.trim().toLowerCase() : '';
 
   // Check if user typed "done"
-  if ((input.type === 'command' && input.value === 'DONE') || normalizedText === 'done') {
     // "done" now unlocks the bot directly (no external subscription check)
     await sendText(psid, '✅ Done received! Access granted.');
     await user.updateOne({ isPageSubscriber: true });
