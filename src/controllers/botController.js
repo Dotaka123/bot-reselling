@@ -14,18 +14,20 @@ const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://www.facebook
 // Labels used by the reseller API (French): '2 heures', '12 heures', '1 jour',
 //   '2 jours', '3 jours', '7 jours', '15 jours', '30 jours'
 const CUSTOM_PRICES = {
-    '1': { // Golden Package
-        '2 heures':  0.30,
-        '12 heures': 0.60,
-        '3 jours':   2.50,
-        '7 jours':   4.50,
-        '15 jours':  10.00,
-        '30 jours':  18.00,
+    '1': { // Golden Package — matched against normalizePrice() label output
+        '2 hours':  0.25,
+        '3 hours':  0.30,
+        '12 hours': 0.45,
+        '1 day':    0.70,
+        '3 days':   2.00,
+        '7 days':   4.00,
+        '15 days':  7.50,
+        '30 days':  14.50,
     },
     '2': { // Silver Package
-        '2 jours':   1.50,
-        '7 jours':   4.00,
-        '30 jours':  12.00,
+        '2 days':   1.10,
+        '7 days':   3.00,
+        '30 days':  10.00,
     }
 };
 
@@ -1170,13 +1172,10 @@ async function handleChangeParent(user, psid, input) {
 
     try {
         await sendText(psid, '⏳ Changing country...');
-        const result = await proxyApi.buyProxy({
-            parentProxyId: parent.id,
-            packageId:     '1',
-            protocol:      proxy.protocol,
-            duration:      proxy.duration,
-            username:      proxy.username,
-            password:      proxy.password
+        // Use modifyProxy (PUT /proxies/{id}) — migrate proxy to a different parent proxy
+        const result = await proxyApi.modifyProxy(proxy.apiProxyId, {
+            parent_proxy_id: parent.id,
+            protocol: proxy.protocol === 'socks5' ? 'socks' : (proxy.protocol || 'http')
         });
 
         if (!result || !result.success) {
