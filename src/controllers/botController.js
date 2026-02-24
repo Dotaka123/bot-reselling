@@ -146,6 +146,7 @@ async function handleMessage(psid, messageText) {
                 case 'BUY_CREDENTIALS':   return await handleBuyCredentials(user, psid, input, messageText);
                 case 'BUY_CONFIRM':       return await handleBuyConfirm(user, psid, input);
                 case 'TOPUP':             return await handleTopUp(user, psid, input, messageText);
+                case 'TOPUP_REF':         return await handleTopUpRef(user, psid, input, messageText);
                 case 'SUPPORT':           return await handleSupport(user, psid, input, messageText);
                 case 'MANAGE_PROXY':      return await handleManageProxy(user, psid, input);
                 case 'CHANGE_COUNTRY':    return await handleChangeCountry(user, psid, input);
@@ -843,34 +844,76 @@ async function handleTopUpStart(user, psid) {
         `💰 TOP-UP BALANCE\n\n` +
         `${paymentInfo}\n\n` +
         `──────────────────────\n` +
-        `After sending the payment, reply here with:\n` +
-        `• Amount paid\n` +
-        `• Transaction ID / reference\n\n` +
-        `Your balance will be credited by an admin.\n\n` +
+        `After sending your payment, reply with the\n` +
+        `💵 Amount paid (numbers only, e.g. 5 or 2.50):\n\n` +
         `(0 = Back, 9 = Menu)`
     );
 }
 
+// Step 1 — User sends amount
 async function handleTopUp(user, psid, input, rawMessage) {
     if (input.type === 'number' && input.value === 0) {
         await userService.setState(user, 'MAIN_MENU');
         return await showMainMenu(psid);
     }
-    const msg = (rawMessage || '').trim();
-    if (msg.length < 3) return await sendText(psid, '❌ Message too short. Please include the amount and transaction ID.\n\n(0 = Back)');
+
+    const raw = (rawMessage || '').trim();
+    // Parse number from input (accepts "5", "2.50", "$3", "3$", "3,50")
+    const match = raw.match(/^\$?\s*(\d+(?:[.,]\d{1,2})?)\s*\$?$/);
+    if (!match) {
+        return await sendText(psid,
+            `❌ Please send the amount as a number only.\n` +
+            `Example: 5  or  2.50\n\n(0 = Back)`
+        );
+    }
+
+    const amount = parseFloat(match[1].replace(',', '.'));
+    if (isNaN(amount) || amount <= 0) {
+        return await sendText(psid, '❌ Invalid amount. Please try again.\n\n(0 = Back)');
+    }
+
+    // Save amount in stateData, move to ref step
+    await userService.setState(user, 'TOPUP_REF', { topupAmount: amount });
+    return await sendText(psid,
+        `💵 Amount: $${amount.toFixed(2)} ✅\n\n` +
+        `Now send your 📋 Transaction ID / Reference:\n` +
+        `(screenshot description, TxID, order ref…)\n\n` +
+        `(0 = Back)`
+    );
+}
+
+// Step 2 — User sends transaction reference
+async function handleTopUpRef(user, psid, input, rawMessage) {
+    if (input.type === 'number' && input.value === 0) {
+        // Back to amount step
+        return await handleTopUpStart(user, psid);
+    }
+
+    const ref = (rawMessage || '').trim();
+    if (ref.length < 2) {
+        return await sendText(psid, '❌ Reference too short. Please send your transaction ID.\n\n(0 = Back)');
+    }
+
+    const amount = user.stateData?.topupAmount || 0.01;
+
     try {
-        // Try to parse amount from message (e.g. "1$", "$1", "1.5")
-        const amountMatch = msg.match(/\$?\s*(\d+(?:[.,]\d+)?)\s*\$?/);
-        const parsedAmount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : 0.01;
-        const amount = parsedAmount > 0 ? parsedAmount : 0.01;
-        await TopUpRequest.create({ userId: user._id, psid, email: user.email, amount, notes: msg });
-        await sendText(psid,
+        await TopUpRequest.create({
+            userId: user._id,
+            psid,
+            email:  user.email,
+            amount,
+            notes:  `Ref: ${ref}`
+        });
+        await userService.setState(user, 'MAIN_MENU');
+        return await sendText(psid,
             `✅ TOP-UP REQUEST SENT!\n\n` +
+            `💵 Amount:    $${amount.toFixed(2)}\n` +
+            `📋 Reference: ${ref}\n\n` +
             `👨‍💼 An admin will verify your payment and credit your balance shortly.\n\n` +
             `(9 = Menu)`
         );
-        await userService.setState(user, 'MAIN_MENU');
-    } catch {
+    } catch (err) {
+        console.error('TopUpRequest.create error:', err.message);
         await sendText(psid, '❌ Error sending request. Please try again.');
     }
 }
