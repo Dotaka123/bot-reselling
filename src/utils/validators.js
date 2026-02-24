@@ -16,24 +16,23 @@ function isValidPassword(password) {
 
 /**
  * Parse l'input utilisateur
- * Retourne { type, value }
+ * Retourne { type, value, raw }
  * type: 'number' | 'command' | 'text'
  * Commandes globales: '0', '9', 'annuler', 'cancel', 'done'
  */
 function parseInput(text) {
-  if (!text) return { type: 'text', value: '' };
+
   const normalized = text.trim();
   const trimmed = normalized.toLowerCase();
 
   // Commandes texte
-  if (trimmed === 'annuler' || trimmed === 'cancel') return { type: 'command', value: 'CANCEL' };
-  if (trimmed === 'done') return { type: 'command', value: 'DONE' };
+
 
   // Nombre
   const num = parseInt(trimmed, 10);
-  if (!isNaN(num) && String(num) === trimmed) return { type: 'number', value: num };
+  if (!isNaN(num) && String(num) === trimmed) return { type: 'number', value: num, raw: normalized };
 
-  return { type: 'text', value: normalized };
+main
 }
 
 module.exports = { isValidEmail, isValidPassword, parseInput };

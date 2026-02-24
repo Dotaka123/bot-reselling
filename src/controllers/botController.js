@@ -8,10 +8,7 @@ const SupportMessage    = require('../models/SupportMessage');
 const TopUpRequest      = require('../models/TopUpRequest');
 const crypto            = require('crypto');
 
-const PAGE = 8;
-const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://www.facebook.com/profile.php?id=61552396135882';
 
-// ── Helpers ─────────────────────────────────────────────────
 function generateCaptcha() {
     const a = Math.floor(Math.random() * 9) + 1;
     const b = Math.floor(Math.random() * 9) + 1;
@@ -55,22 +52,7 @@ async function handlePaginatedInput({ user, psid, input, items, page, tp, stateN
         await showFn(pageItems, page, tp);
         return null;
     }
-    return { idx, pageItems };
-}
 
-// ── Main Entry Point ────────────────────────────────────────
-async function handleMessage(psid, messageText) {
-    if (!messageText) return;
-
-    let user;
-    try {
-        user = await userService.getOrCreateUser(psid);
-    } catch (err) {
-        console.error('User Error:', err);
-        return;
-    }
-
-    const input = parseInput(messageText);
 
     // 1. FORCE FACEBOOK VERIFICATION
     if (!user.isPageSubscriber && user.state !== 'FB_VERIFICATION') {
