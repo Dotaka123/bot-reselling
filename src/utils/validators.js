@@ -1,37 +1,97 @@
-const validator = require('validator');
-
 /**
- * Valide un email
- */
-function isValidEmail(email) {
-  return typeof email === 'string' && validator.isEmail(email.trim());
-}
-
-/**
- * Valide un mot de passe (min 6 chars)
- */
-function isValidPassword(password) {
-  return typeof password === 'string' && password.length >= 6;
-}
-
-/**
- * Parse l'input utilisateur
- * Retourne { type, value }
- * type: 'number' | 'command' | 'text'
- * Commandes globales: '0', '9', 'annuler'
+ * Parser l'input utilisateur
+ * Retourne { type, value, raw }
+ * - type: 'number' | 'command' | 'text'
+ * - value: la valeur parsée
+ * - raw: le texte original
  */
 function parseInput(text) {
-  if (!text) return { type: 'text', value: '' };
-  const trimmed = text.trim().toLowerCase();
-
-  // Commandes texte uniquement
-  if (trimmed === 'annuler') return { type: 'command', value: 'ANNULER' };
-
-  // Nombre
-  const num = parseInt(trimmed, 10);
-  if (!isNaN(num) && String(num) === trimmed) return { type: 'number', value: num };
-
-  return { type: 'text', value: text.trim() };
+    const trimmed = text.trim();
+    
+    // Vérifier si c'est un nombre
+    const num = parseInt(trimmed, 10);
+    if (!isNaN(num)) {
+        return {
+            type: 'number',
+            value: num,
+            raw: trimmed
+        };
+    }
+    
+    // Vérifier les commandes
+    const lowerText = trimmed.toLowerCase();
+    if (lowerText === 'cancel' || lowerText === 'annuler') {
+        return {
+            type: 'command',
+            value: 'CANCEL',
+            raw: trimmed
+        };
+    }
+    
+    if (lowerText === 'done' || lowerText === 'fait') {
+        return {
+            type: 'command',
+            value: 'DONE',
+            raw: trimmed
+        };
+    }
+    
+    // Sinon c'est du texte
+    return {
+        type: 'text',
+        value: trimmed,
+        raw: trimmed
+    };
 }
 
-module.exports = { isValidEmail, isValidPassword, parseInput };
+/**
+ * Valider un email
+ */
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+/**
+ * Valider un mot de passe
+ * Minimum 6 caractères
+ */
+function isValidPassword(password) {
+    return password && password.length >= 6;
+}
+
+/**
+ * Valider une URL
+ */
+function isValidUrl(url) {
+    try {
+        new URL(url);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Valider un nombre positif
+ */
+function isValidAmount(amount) {
+    const num = parseFloat(amount);
+    return !isNaN(num) && num > 0;
+}
+
+/**
+ * Nettoyer une chaîne de texte
+ */
+function sanitizeText(text) {
+    return text.trim().replace(/[<>]/g, '');
+}
+
+module.exports = {
+    parseInput,
+    isValidEmail,
+    isValidPassword,
+    isValidUrl,
+    isValidAmount,
+    sanitizeText
+};

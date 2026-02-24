@@ -1,39 +1,90 @@
 const mongoose = require('mongoose');
-const bcrypt   = require('bcryptjs');
 
 const UserSchema = new mongoose.Schema({
-  psid:         { type: String, required: true, unique: true, index: true },
-  facebookName: { type: String, default: '' },
-
-  email:        { type: String, lowercase: true, sparse: true, default: null },
-  password:     { type: String, default: null },
-  isRegistered: { type: Boolean, default: false },
-
-  // Balance du wallet utilisateur (en $, rechargée par l'admin)
-  balance:      { type: Number, default: 0 },
-
-  state:         { type: String, default: 'WELCOME' },
-  stateData:     { type: Object, default: {} },
-  previousState: { type: String, default: null },
-
-  isLoggedIn:   { type: Boolean, default: false },
-  lastActivity: { type: Date,    default: Date.now },
-  createdAt:    { type: Date,    default: Date.now }
+    // Identifiant Messenger
+    psid: {
+        type: String,
+        unique: true,
+        required: true,
+        index: true
+    },
+    
+    // Credentials
+    email: {
+        type: String,
+        unique: true,
+        sparse: true,  // Permet null values sans violation unique
+        lowercase: true,
+        trim: true
+    },
+    passwordHash: String,
+    
+    // État de la conversation
+    state: {
+        type: String,
+        default: 'WELCOME',
+        enum: [
+            'WELCOME', 'FB_VERIFICATION',
+            'CAPTCHA_LOGIN', 'CAPTCHA_REGISTER',
+            'LOGIN_EMAIL', 'LOGIN_PASSWORD',
+            'REGISTER_EMAIL', 'REGISTER_PASSWORD',
+            'MAIN_MENU',
+            'BUY_PKG', 'BUY_PROTO', 'BUY_DURATION', 'BUY_COUNTRY', 'BUY_CITY', 'BUY_PROVIDER', 'BUY_PARENT', 'BUY_CONFIRM',
+            'TOPUP', 'SUPPORT'
+        ]
+    },
+    
+    // Données d'état (pagination, sélections, etc)
+    stateData: {
+        type: Object,
+        default: {}
+    },
+    
+    // Statut d'authentification
+    isLoggedIn: {
+        type: Boolean,
+        default: false
+    },
+    
+    // Vérification Facebook
+    isPageSubscriber: {
+        type: Boolean,
+        default: false
+    },
+    
+    // Solde
+    balance: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    
+    // Timestamps
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { 
+    timestamps: true 
 });
 
-UserSchema.pre('save', async function (next) {
-  if (!this.isModified('password') || !this.password) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
-});
+// Index pour des requêtes rapides
+UserSchema.index({ psid: 1 });
+UserSchema.index({ email: 1 });
+UserSchema.index({ createdAt: -1 });
 
-UserSchema.methods.verifyPassword = async function (plain) {
-  return bcrypt.compare(plain, this.password);
+// Méthode pour obtenir les jours restants des proxies
+UserSchema.methods.daysLeft = function() {
+    if (!this.expiresAt) return null;
+    const now = new Date();
+    const expiry = new Date(this.expiresAt);
+    const diffTime = expiry - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
 };
 
-UserSchema.methods.touch = function () {
-  this.lastActivity = new Date();
-  return this.save();
-};
-
-module.exports = mongoose.model('BotUser', UserSchema);
+module.exports = mongoose.model('User', UserSchema);
