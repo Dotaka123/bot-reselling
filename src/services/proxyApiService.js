@@ -7,9 +7,14 @@
  */
 const axios = require('axios');
 
-const BASE     = process.env.PROXY_API_URL || 'https://bot.mega-panel.net/api/web/index.php/v1';
-const EMAIL    = process.env.PROXY_API_EMAIL    || 'mdraselphd6@gmail.com';
-const PASSWORD = process.env.PROXY_API_PASSWORD || '@phdidea6';
+// ⚠️  Noms de variables identiques au projet de référence
+const BASE     = process.env.API_BASE_URL || 'https://bot.mega-panel.net/api/web/index.php/v1';
+const EMAIL    = process.env.API_EMAIL    || 'mdraselphd6@gmail.com';
+const PASSWORD = process.env.API_PASSWORD || '@phdidea6';
+
+// Package IDs (configurable via .env)
+const GOLDEN_PKG_ID = parseInt(process.env.GOLDEN_PACKAGE_ID) || 1;
+const SILVER_PKG_ID = parseInt(process.env.SILVER_PACKAGE_ID) || 2;
 
 let _token       = null;
 let _tokenExpiry = 0; // unix seconds
@@ -90,24 +95,43 @@ function normalizePrice(p) {
 
 // ── CATALOGUE ─────────────────────────────────────────────────────────────────
 
-/** Returns [{ id, package_name }] */
+/**
+ * Returns package list from local config (no API call needed).
+ * Matches GOLDEN_PACKAGE_ID / SILVER_PACKAGE_ID env vars.
+ */
 async function getPackages() {
-    return api('GET', '/packages');
+    return [
+        { id: GOLDEN_PKG_ID, package_name: 'Golden' },
+        { id: SILVER_PKG_ID, package_name: 'Silver'  }
+    ];
 }
 
 /**
- * Returns prices grouped by package id:
- *   { "1": [{duration, price, label}, ...], "2": [...] }
- * Calls GET /prices?pkg_id=X for every package.
+ * Returns prices grouped by package id.
+ * Prices are hardcoded locally (CUSTOM_PRICES in botController overrides them anyway).
+ * Structure must match what botController.applyCustomPrices() expects.
+ * Format: { "1": [{duration, price, label}, ...], "2": [...] }
  */
 async function getPrices() {
-    const packages = await getPackages();
-    const result   = {};
-    for (const pkg of packages) {
-        const raw = await api('GET', '/prices', null, { pkg_id: pkg.id });
-        result[String(pkg.id)] = (Array.isArray(raw) ? raw : []).map(normalizePrice);
-    }
-    return result;
+    // These are placeholder prices — botController.CUSTOM_PRICES will override them all.
+    // Duration encoding: < 1 = hours/100 (0.02 = 2h, 0.12 = 12h), >= 1 = days
+    return {
+        [String(GOLDEN_PKG_ID)]: [
+            { duration: 0.02, price: 0.25, label: '2 hours'  },
+            { duration: 0.03, price: 0.30, label: '3 hours'  },
+            { duration: 0.12, price: 0.45, label: '12 hours' },
+            { duration: 1,    price: 0.70, label: '1 day'    },
+            { duration: 3,    price: 2.00, label: '3 days'   },
+            { duration: 7,    price: 4.00, label: '7 days'   },
+            { duration: 15,   price: 7.50, label: '15 days'  },
+            { duration: 30,   price: 14.50,label: '30 days'  },
+        ],
+        [String(SILVER_PKG_ID)]: [
+            { duration: 2,  price: 1.10, label: '2 days'  },
+            { duration: 7,  price: 3.00, label: '7 days'  },
+            { duration: 30, price: 10.00,label: '30 days' },
+        ]
+    };
 }
 
 /** Returns [{ id, country_name }] */
