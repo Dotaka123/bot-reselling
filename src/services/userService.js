@@ -1,8 +1,6 @@
 const User = require('../models/User');
+const Proxy = require('../models/Proxy');
 
-/**
- * Récupère un utilisateur par son PSID (Messenger ID)
- */
 async function getUserByPsid(psid) {
     try {
         return await User.findOne({ psid });
@@ -12,9 +10,6 @@ async function getUserByPsid(psid) {
     }
 }
 
-/**
- * Créer un nouvel utilisateur (sans credentials)
- */
 async function createUser(psid) {
     try {
         const user = new User({
@@ -33,9 +28,6 @@ async function createUser(psid) {
     }
 }
 
-/**
- * Créer un utilisateur avec email et mot de passe
- */
 async function createUserWithCredentials(psid, email, passwordHash) {
     try {
         const user = new User({
@@ -56,9 +48,6 @@ async function createUserWithCredentials(psid, email, passwordHash) {
     }
 }
 
-/**
- * Récupère un utilisateur par son email
- */
 async function getUserByEmail(email) {
     try {
         return await User.findOne({ email });
@@ -68,12 +57,6 @@ async function getUserByEmail(email) {
     }
 }
 
-/**
- * Définir l'état de l'utilisateur
- * @param {User} user - L'objet utilisateur
- * @param {string} stateName - Le nom du nouvel état
- * @param {object} stateData - Les données associées à cet état (optionnel)
- */
 async function setState(user, stateName, stateData = {}) {
     try {
         user.state = stateName;
@@ -86,12 +69,8 @@ async function setState(user, stateName, stateData = {}) {
     }
 }
 
-/**
- * Obtenir les proxies actifs d'un utilisateur
- */
 async function getActiveProxies(userId) {
     try {
-        const Proxy = require('../models/Proxy');
         return await Proxy.find({ userId, status: 'ACTIVE' });
     } catch (err) {
         console.error('Error getting active proxies:', err);
@@ -99,12 +78,8 @@ async function getActiveProxies(userId) {
     }
 }
 
-/**
- * Obtenir les proxies expirés d'un utilisateur
- */
 async function getExpiredProxies(userId) {
     try {
-        const Proxy = require('../models/Proxy');
         return await Proxy.find({ userId, status: 'EXPIRED' });
     } catch (err) {
         console.error('Error getting expired proxies:', err);
@@ -112,9 +87,6 @@ async function getExpiredProxies(userId) {
     }
 }
 
-/**
- * Ajouter du solde à un utilisateur
- */
 async function addBalance(userId, amount) {
     try {
         const user = await User.findById(userId);
@@ -130,9 +102,6 @@ async function addBalance(userId, amount) {
     }
 }
 
-/**
- * Débiter le solde d'un utilisateur
- */
 async function deductBalance(userId, amount) {
     try {
         const user = await User.findById(userId);
@@ -148,9 +117,6 @@ async function deductBalance(userId, amount) {
     }
 }
 
-/**
- * Obtenir toutes les informations du profil utilisateur
- */
 async function getUserProfile(userId) {
     try {
         const user = await User.findById(userId);
@@ -159,13 +125,7 @@ async function getUserProfile(userId) {
         const activeProxies = await getActiveProxies(userId);
         const expiredProxies = await getExpiredProxies(userId);
         
-        return {
-            user,
-            activeProxies,
-            expiredProxies,
-            activeCount: activeProxies.length,
-            expiredCount: expiredProxies.length
-        };
+        return { user, activeProxies, expiredProxies };
     } catch (err) {
         console.error('Error getting user profile:', err);
         return null;
@@ -173,14 +133,6 @@ async function getUserProfile(userId) {
 }
 
 module.exports = {
-    getUserByPsid,
-    createUser,
-    createUserWithCredentials,
-    getUserByEmail,
-    setState,
-    getActiveProxies,
-    getExpiredProxies,
-    addBalance,
-    deductBalance,
-    getUserProfile
+    getUserByPsid, createUser, createUserWithCredentials, getUserByEmail,
+    setState, getActiveProxies, getExpiredProxies, addBalance, deductBalance, getUserProfile
 };

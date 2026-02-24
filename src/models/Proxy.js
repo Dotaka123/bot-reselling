@@ -1,65 +1,37 @@
 const mongoose = require('mongoose');
 
-/**
- * Modèle proxy acheté par un utilisateur du bot
- */
 const ProxySchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    ip: { type: String, required: true },
+    port: { type: Number, required: true },
+    username: { type: String, required: true },
+    password: { type: String, required: true },
+    protocol: { type: String, enum: ['http', 'socks5'], required: true },
+    country: String,
+    city: String,
+    provider: String,
+    duration: { type: Number, required: true },
+    purchaseDate: { type: Date, default: Date.now },
+    expiresAt: { type: Date, required: true },
+    status: { type: String, enum: ['ACTIVE', 'EXPIRED', 'SUSPENDED'], default: 'ACTIVE' },
+    price: { type: Number, required: true },
+    package: { type: String, enum: ['GOLDEN', 'SILVER'], default: 'SILVER' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
 
-  // ── Propriétaire ───────────────────────────
-  userId: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'BotUser',
-    required: true,
-    index:    true
-  },
-  psid: { type: String, required: true }, // dénormalisé pour requêtes rapides
+ProxySchema.index({ userId: 1, status: 1 });
+ProxySchema.index({ expiresAt: 1 });
 
-  // ── Données proxy ──────────────────────────
-  ip:       { type: String, required: true },
-  port:     { type: Number, required: true },
-  username: { type: String, required: true },
-  password: { type: String, required: true },
-  protocol: { type: String, default: 'http', enum: ['http', 'socks', 'socks5'] },
-
-  // ── Localisation ───────────────────────────
-  country:     { type: String },
-  countryCode: { type: String },
-  city:        { type: String },
-  provider:    { type: String },
-
-  // ── Données de l'API externe ───────────────
-  apiProxyId:   { type: Number },
-  packageId:    { type: Number },
-  duration:     { type: Number }, // en jours
-  packageLabel: { type: String }, // ex: "7 jours"
-  price:        { type: Number },
-  rawData:      { type: Object, default: {} },
-
-  // ── Durée de vie ───────────────────────────
-  purchasedAt: { type: Date, default: Date.now },
-  expiresAt:   { type: Date },
-  status: {
-    type:    String,
-    default: 'ACTIF',
-    enum:    ['ACTIF', 'EXPIRÉ', 'SUSPENDU']
-  }
-});
-
-// Méthodes utiles
-ProxySchema.methods.daysLeft = function () {
-  if (!this.expiresAt) return null;
-  const diff = this.expiresAt - new Date();
-  return Math.max(0, Math.ceil(diff / 86400000));
+ProxySchema.methods.daysLeft = function() {
+    if (!this.expiresAt) return null;
+    const diffTime = this.expiresAt - new Date();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
 };
 
-ProxySchema.methods.isExpired = function () {
-  if (!this.expiresAt) return false;
-  return new Date() > this.expiresAt;
-};
-
-// Chaîne proxy complète
-ProxySchema.methods.proxyString = function () {
-  return `${this.protocol}://${this.username}:${this.password}@${this.ip}:${this.port}`;
+ProxySchema.methods.getConnectionString = function() {
+    return `${this.protocol}://${this.username}:${this.password}@${this.ip}:${this.port}`;
 };
 
 module.exports = mongoose.model('Proxy', ProxySchema);
