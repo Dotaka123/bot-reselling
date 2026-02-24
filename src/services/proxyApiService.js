@@ -44,14 +44,25 @@ async function getToken() {
 
 async function api(method, endpoint, data = null, params = null) {
     const token = await getToken();
+
+    // Yii2 supports two auth methods depending on server config:
+    //   1. QueryParamAuth  → ?access-token=TOKEN  (Yii2 default)
+    //   2. HttpBearerAuth  → Authorization: Bearer TOKEN
+    // We send BOTH to cover either configuration.
     const cfg = {
         method,
         url:     `${BASE}${endpoint}`,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        params:  { 'access-token': token },  // Yii2 QueryParamAuth
         timeout: 15000
     };
+
+    // Merge any extra query params passed by caller
+    if (params) cfg.params = { ...cfg.params, ...params };
     if (data)   cfg.data   = data;
-    if (params) cfg.params = params;
 
     try {
         return (await axios(cfg)).data;
@@ -64,7 +75,8 @@ async function api(method, endpoint, data = null, params = null) {
         if (status === 401) {
             _token = null;
             const newToken = await getToken();
-            cfg.headers.Authorization = `Bearer ${newToken}`;
+            cfg.headers['Authorization'] = `Bearer ${newToken}`;
+            cfg.params['access-token']   = newToken;
             return (await axios(cfg)).data;
         }
         throw err;
