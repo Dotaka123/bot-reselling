@@ -87,6 +87,13 @@ async function handleMessage(psid, messageText) {
         let user = await userService.getUserByPsid(psid);
         if (!user) user = await userService.createUser(psid);
 
+        // Guard: if user creation failed (e.g. DB error), abort gracefully
+        if (!user) {
+            console.error(`handleMessage: createUser returned null for psid ${psid}`);
+            await sendText(psid, '❌ A server error occurred. Please try again in a moment.');
+            return;
+        }
+
         // 1. FACEBOOK SUBSCRIPTION GATE
         if (!user.isPageSubscriber && user.state !== 'FB_VERIFICATION') {
             await userService.setState(user, 'FB_VERIFICATION');
@@ -140,6 +147,10 @@ async function handleMessage(psid, messageText) {
                 case 'BUY_CONFIRM':       return await handleBuyConfirm(user, psid, input);
                 case 'TOPUP':             return await handleTopUp(user, psid, input, messageText);
                 case 'SUPPORT':           return await handleSupport(user, psid, input, messageText);
+                case 'MANAGE_PROXY':      return await handleManageProxy(user, psid, input);
+                case 'CHANGE_COUNTRY':    return await handleChangeCountry(user, psid, input);
+                case 'CHANGE_CITY':       return await handleChangeCity(user, psid, input);
+                case 'CHANGE_PARENT':     return await handleChangeParent(user, psid, input);
                 default:
                     await userService.setState(user, 'WELCOME');
                     return await handleWelcome(user, psid, input);
@@ -322,25 +333,8 @@ async function handleMainMenu(user, psid, input) {
             );
         }
 
-        case 3: {
-            const actives  = await userService.getActiveProxies(user._id);
-            const expired  = await userService.getExpiredProxies(user._id);
-            const all      = [...actives, ...expired];
-            if (all.length === 0) return await sendText(psid, `📦 MY PROXIES\n\nYou have no proxies yet.\n\n(9 = Menu)`);
-
-            let msg = `📦 MY PROXIES\n\n`;
-            all.slice(0, 5).forEach((p, i) => {
-                const exp = p.expiresAt ? new Date(p.expiresAt) : null;
-                const daysLeft = exp ? Math.ceil((exp - Date.now()) / 86400000) : null;
-                const status = daysLeft !== null && daysLeft <= 0 ? '❌ EXPIRED' : '✅ ACTIVE';
-                msg += `${i + 1}. ${p.ip}:${p.httpPort}\n`;
-                msg += `   👤 ${p.username}  🔑 ${p.password}\n`;
-                msg += `   ${p.country}, ${p.city} | ${status}\n\n`;
-            });
-            if (all.length > 5) msg += `... and ${all.length - 5} more\n`;
-            msg += `(9 = Menu)`;
-            return await sendText(psid, msg);
-        }
+        case 3:
+            return await showMyProxies(user, psid);
 
         case 4:
             return await handleTopUpStart(user, psid);
@@ -898,5 +892,285 @@ async function handleSupport(user, psid, input, rawMessage) {
         await sendText(psid, '❌ Error sending message. Please try again.');
     }
 }
+
+
+// ── MY PROXIES ────────────────────────────────────────────────────────────────
+
+async function showMyProxies(user, psid) {
+    const actives = await userService.getActiveProxies(user._id);
+    const expired = await userService.getExpiredProxies(user._id);
+    const all     = [...actives, ...expired];
+
+    if (all.length === 0) {
+        return await sendText(psid, `📦 MY PROXIES\n\nYou have no proxies yet.\n\n(9 = Menu)`);
+    }
+
+    await userService.setState(user, 'MANAGE_PROXY', { proxies: all.map(p => p._id.toString()) });
+
+    let msg = `📦 MY PROXIES\n\nSelect a proxy to manage:\n\n`;
+    all.forEach((p, i) => {
+        const daysLeft = p.expiresAt ? Math.ceil((new Date(p.expiresAt) - Date.now()) / 86400000) : null;
+        const status   = daysLeft !== null && daysLeft <= 0 ? '❌' : '✅';
+        const pkg      = (p.package || '').includes('GOLDEN') || (p.package || '').includes('1') ? '🥇' : '🥈';
+        msg += `${i + 1}️⃣  ${status} ${pkg} ${p.ip}:${p.port || p.httpPort || '—'}\n`;
+        msg += `     📍 ${p.country || '—'} | ${daysLeft !== null && daysLeft > 0 ? daysLeft + 'd left' : 'Expired'}\n\n`;
+    });
+    msg += `(0 = Back, 9 = Menu)`;
+    return await sendText(psid, msg);
+}
+
+async function handleManageProxy(user, psid, input) {
+    if (input.type === 'number' && input.value === 0) {
+        await userService.setState(user, 'MAIN_MENU');
+        return await showMainMenu(psid);
+    }
+    const { proxies } = user.stateData;
+    if (!proxies) return await showMyProxies(user, psid);
+
+    const idx = (input.value || 0) - 1;
+    if (input.type !== 'number' || idx < 0 || idx >= proxies.length) {
+        return await sendText(psid, `❌ Pick a number from 1 to ${proxies.length}:\n\n(0 = Back)`);
+    }
+
+    const Proxy = require('../models/Proxy');
+    const proxy = await Proxy.findById(proxies[idx]);
+    if (!proxy) return await sendText(psid, '❌ Proxy not found.\n\n(9 = Menu)');
+
+    const daysLeft  = proxy.expiresAt ? Math.ceil((new Date(proxy.expiresAt) - Date.now()) / 86400000) : null;
+    const isActive  = daysLeft !== null && daysLeft > 0;
+    const isGolden  = (proxy.package || '').toUpperCase().includes('GOLDEN') || (proxy.package || '') === '1';
+
+    await userService.setState(user, 'MANAGE_PROXY', {
+        proxies,
+        selectedProxyId: proxy._id.toString(),
+        isGolden
+    });
+
+    let msg =
+        `🔍 PROXY DETAILS\n\n` +
+        `🌐 Host:     ${proxy.ip}:${proxy.port || proxy.httpPort || '—'}\n` +
+        `👤 Username: ${proxy.username}\n` +
+        `🔑 Password: ${proxy.password}\n` +
+        `📡 Protocol: ${proxy.protocol}\n` +
+        `📍 Location: ${proxy.country || '—'}, ${proxy.city || '—'}\n` +
+        `📦 Package:  ${isGolden ? '🥇 Golden' : '🥈 Silver'}\n` +
+        `⏱️  Status:   ${isActive ? '✅ Active — ' + daysLeft + ' day(s) left' : '❌ Expired'}\n\n`;
+
+    // Handle action selection on second call (selectedProxyId already set)
+    if (user.stateData.selectedProxyId && input.type === 'number' && input.value === 1 && isGolden && isActive) {
+        await userService.setState(user, 'CHANGE_COUNTRY', { ...user.stateData });
+        return await handleChangeCountry(user, psid, { type: 'text', value: null });
+    }
+
+    if (isGolden && isActive) {
+        msg +=
+            `What would you like to do?\n\n` +
+            `1️⃣  🌍 Change country\n` +
+            `0️⃣  ← Back to proxy list`;
+    } else if (!isGolden) {
+        msg +=
+            `ℹ️  Silver proxies have a fixed country.\n` +
+            `To get a different location, purchase a new proxy.\n\n` +
+            `0️⃣  ← Back`;
+    } else {
+        msg += `0️⃣  ← Back`;
+    }
+
+    return await sendText(psid, msg);
+}
+
+// Golden: Change Country Flow
+async function handleChangeCountry(user, psid, input) {
+    if (input.type === 'number' && input.value === 0) {
+        // Back to proxy detail
+        await userService.setState(user, 'MANAGE_PROXY', { ...user.stateData, countries: undefined });
+        const Proxy = require('../models/Proxy');
+        const proxy = await Proxy.findById(user.stateData.selectedProxyId);
+        if (!proxy) return await showMyProxies(user, psid);
+        const isGolden = (proxy.package || '').toUpperCase().includes('GOLDEN');
+        const daysLeft = proxy.expiresAt ? Math.ceil((new Date(proxy.expiresAt) - Date.now()) / 86400000) : null;
+        const isActive = daysLeft !== null && daysLeft > 0;
+        let msg =
+            `🔍 PROXY DETAILS\n\n` +
+            `🌐 ${proxy.ip}:${proxy.port || '—'}  📍 ${proxy.country || '—'}\n\n` +
+            (isGolden && isActive
+                ? `1️⃣  🌍 Change country\n0️⃣  ← Back`
+                : `0️⃣  ← Back`);
+        return await sendText(psid, msg);
+    }
+
+    const { countries, selectedProxyId } = user.stateData;
+
+    // First call: load country list
+    if (!countries) {
+        try {
+            await sendText(psid, '⏳ Loading countries...');
+            const list = await proxyApi.getCountries('1'); // Golden = pkg 1
+            if (!list || !list.length) return await sendText(psid, '❌ No countries available.\n\n(0 = Back)');
+
+            await userService.setState(user, 'CHANGE_COUNTRY', { ...user.stateData, countries: list, countryPage: 1 });
+
+            let msg = `🌍 CHANGE COUNTRY\n\nAvailable countries:\n\n`;
+            list.slice(0, 10).forEach((c, i) => { msg += `${i + 1}️⃣  ${c.country_name}\n`; });
+            if (list.length > 10) msg += `\n... and ${list.length - 10} more (type number)`;
+            msg += `\n\n(0 = Back)`;
+            return await sendText(psid, msg);
+        } catch (err) {
+            console.error('getCountries error:', err.message);
+            return await sendText(psid, '❌ Error loading countries. Try again.\n\n(0 = Back)');
+        }
+    }
+
+    // User picked a country number
+    const idx = (input.value || 0) - 1;
+    if (idx < 0 || idx >= countries.length) {
+        return await sendText(psid, `❌ Pick a number from 1 to ${Math.min(countries.length, 10)}.`);
+    }
+
+    const country = countries[idx];
+
+    // Load cities for this country
+    try {
+        await sendText(psid, `⏳ Loading cities in ${country.country_name}...`);
+        const cities = await proxyApi.getCities(country.id, '1');
+
+        if (!cities || !cities.length) {
+            return await sendText(psid, `❌ No cities available in ${country.country_name}.\n\n(0 = Back)`);
+        }
+
+        await userService.setState(user, 'CHANGE_CITY', {
+            ...user.stateData,
+            selectedCountryId: country.id,
+            selectedCountryName: country.country_name,
+            cities
+        });
+
+        let msg = `🏙️  SELECT CITY in ${country.country_name}\n\n`;
+        cities.slice(0, 10).forEach((c, i) => { msg += `${i + 1}️⃣  ${c.city_name}\n`; });
+        msg += `\n(0 = Back)`;
+        return await sendText(psid, msg);
+    } catch (err) {
+        return await sendText(psid, '❌ Error loading cities.\n\n(0 = Back)');
+    }
+}
+
+async function handleChangeCity(user, psid, input) {
+    if (input.type === 'number' && input.value === 0) {
+        // Back to country list — reset to show countries again
+        await userService.setState(user, 'CHANGE_COUNTRY', { ...user.stateData, cities: undefined, selectedCountryId: undefined });
+        const { countries } = user.stateData;
+        let msg = `🌍 CHANGE COUNTRY\n\nAvailable countries:\n\n`;
+        (countries || []).slice(0, 10).forEach((c, i) => { msg += `${i + 1}️⃣  ${c.country_name}\n`; });
+        msg += `\n\n(0 = Back)`;
+        return await sendText(psid, msg);
+    }
+
+    const { cities, selectedCountryName, selectedProxyId } = user.stateData;
+    const idx = (input.value || 0) - 1;
+    if (!cities || idx < 0 || idx >= cities.length) {
+        return await sendText(psid, `❌ Pick a number from 1 to ${(cities || []).length}.`);
+    }
+
+    const city = cities[idx];
+
+    // Get available parents in this city
+    try {
+        await sendText(psid, `⏳ Finding proxy in ${city.city_name}...`);
+        const parents = await proxyApi.getParents('1', 0, city.id);
+        const available = parents.filter(p => p.is_available || p.status === 'active');
+
+        if (!available.length) {
+            return await sendText(psid, `❌ No proxy available in ${city.city_name}. Try another city.\n\n(0 = Back)`);
+        }
+
+        await userService.setState(user, 'CHANGE_PARENT', {
+            ...user.stateData,
+            selectedCityId: city.id,
+            selectedCityName: city.city_name,
+            parents: available
+        });
+
+        let msg = `📡 SELECT PROXY in ${city.city_name}\n\n`;
+        available.slice(0, 8).forEach((p, i) => {
+            msg += `${i + 1}️⃣  ${p.technology || 'N/A'} | Rotation: ${p.rotation_time != null ? p.rotation_time + 'min' : 'N/A'}\n`;
+        });
+        msg += `\n(0 = Back)`;
+        return await sendText(psid, msg);
+    } catch (err) {
+        return await sendText(psid, '❌ Error loading proxies.\n\n(0 = Back)');
+    }
+}
+
+async function handleChangeParent(user, psid, input) {
+    if (input.type === 'number' && input.value === 0) {
+        // Back to city selection
+        await userService.setState(user, 'CHANGE_CITY', { ...user.stateData, parents: undefined, selectedCityId: undefined });
+        const { cities, selectedCountryName } = user.stateData;
+        let msg = `🏙️  SELECT CITY in ${selectedCountryName}\n\n`;
+        (cities || []).slice(0, 10).forEach((c, i) => { msg += `${i + 1}️⃣  ${c.city_name}\n`; });
+        msg += `\n(0 = Back)`;
+        return await sendText(psid, msg);
+    }
+
+    const { parents, selectedProxyId, selectedCityName, selectedCountryName } = user.stateData;
+    const idx = (input.value || 0) - 1;
+    if (!parents || idx < 0 || idx >= parents.length) {
+        return await sendText(psid, `❌ Pick a number from 1 to ${(parents || []).length}.`);
+    }
+
+    const parent = parents[idx];
+
+    // Apply the country change — buy a new proxy with same credentials on the new parent
+    const Proxy = require('../models/Proxy');
+    const proxy = await Proxy.findById(selectedProxyId);
+    if (!proxy) return await sendText(psid, '❌ Proxy not found.\n\n(9 = Menu)');
+
+    try {
+        await sendText(psid, '⏳ Changing country...');
+        const result = await proxyApi.buyProxy({
+            parentProxyId: parent.id,
+            packageId:     '1',
+            protocol:      proxy.protocol,
+            duration:      proxy.duration,
+            username:      proxy.username,
+            password:      proxy.password
+        });
+
+        if (!result || !result.success) {
+            return await sendText(psid,
+                `❌ Country change failed: ${result?.error || 'Unknown error'}\n\n` +
+                `Contact support if the issue persists.\n(9 = Menu)`
+            );
+        }
+
+        const newProxy = result.proxy;
+
+        // Update stored proxy with new IP / location
+        proxy.ip      = newProxy.ip_addr || proxy.ip;
+        proxy.port    = newProxy.port    || proxy.port;
+        proxy.country = newProxy.country_name || selectedCountryName;
+        proxy.city    = newProxy.city_name    || selectedCityName;
+        proxy.updatedAt = new Date();
+        await proxy.save();
+
+        await userService.setState(user, 'MAIN_MENU');
+        return await sendText(psid,
+            `✅ COUNTRY CHANGED!\n\n` +
+            `🌍 New location: ${proxy.country}, ${proxy.city}\n` +
+            `🌐 New host: ${proxy.ip}:${proxy.port}\n` +
+            `👤 Username: ${proxy.username}\n` +
+            `🔑 Password: ${proxy.password}\n\n` +
+            `(9 = Menu)`
+        );
+    } catch (err) {
+        console.error('changeCountry error:', err.message);
+        return await sendText(psid,
+            `❌ Error changing country: ${err.response?.data?.error || err.message}\n\n` +
+            `Contact support if the issue persists.\n(9 = Menu)`
+        );
+    }
+}
+
+
 
 module.exports = { handleMessage };
