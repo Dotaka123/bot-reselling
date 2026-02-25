@@ -677,13 +677,23 @@ async function doLogin() {
     } catch { errEl.textContent = 'Connection error.'; }
 }
 
-function doLogout() {
-    apiFetch('/api/admin/logout', 'POST').catch(() => {});
+function _clearSession() {
     TOKEN = null;
     localStorage.removeItem('adminToken');
     document.getElementById('app').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('pwdInput').value = '';
+}
+
+function doLogout() {
+    // Use raw fetch — NOT apiFetch — to avoid infinite loop when server returns 401
+    if (TOKEN) {
+        fetch('/api/admin/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN }
+        }).catch(() => {});
+    }
+    _clearSession();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -696,7 +706,8 @@ async function apiFetch(url, method = 'GET', body = null) {
     };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(url, opts);
-    if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+    // On 401: clear session directly — never call doLogout() here (would cause infinite loop)
+    if (res.status === 401) { _clearSession(); throw new Error('Unauthorized'); }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erreur API');
     return data;
