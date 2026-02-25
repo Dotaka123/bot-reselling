@@ -1075,7 +1075,7 @@ async function sendBroadcast() {
     res.textContent = '⏳ Sending…';
 
     try {
-        const data = await api('/broadcast', 'POST', { message });
+        const data = await apiFetch('/admin/broadcast', 'POST', { message });
         res.style.color = 'var(--success, #22c55e)';
         res.textContent = `✅ Done! Sent: ${data.sent} | Failed: ${data.failed} | Total users: ${data.total}`;
     } catch (e) {
