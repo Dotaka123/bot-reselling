@@ -5,6 +5,7 @@ const proxyApi    = require('../services/proxyApiService');
 const proxyService = require('../services/proxyService');
 const SupportMessage = require('../models/SupportMessage');
 const TopUpRequest   = require('../models/TopUpRequest');
+const PaymentMethod  = require('../models/PaymentMethod');
 
 const PAGE_SIZE = 8;
 const FACEBOOK_PAGE_URL = process.env.FACEBOOK_PAGE_URL || 'https://www.facebook.com/yourpage';
@@ -151,6 +152,7 @@ async function handleMessage(psid, messageText) {
                 case 'BUY_PARENT':        return await handleBuyParent(user, psid, input);
                 case 'BUY_CREDENTIALS':   return await handleBuyCredentials(user, psid, input, messageText);
                 case 'BUY_CONFIRM':       return await handleBuyConfirm(user, psid, input);
+                case 'TOPUP_METHOD':      return await handleTopUpMethod(user, psid, input);
                 case 'TOPUP':             return await handleTopUp(user, psid, input, messageText);
                 case 'TOPUP_REF':         return await handleTopUpRef(user, psid, input, messageText);
                 case 'SUPPORT':           return await handleSupport(user, psid, input, messageText);
@@ -841,70 +843,108 @@ async function handleBuyConfirm(user, psid, input) {
 
 // ── TOP-UP ────────────────────────────────────────────────────────────────────
 
+// Entry point — show payment method list
 async function handleTopUpStart(user, psid) {
-    const paymentInfo = process.env.PAYMENT_INFO ||
-        'Choose payment method:\n'
-        + '💳 Binance - Recharge ID: 909914646\n'
-        + '💳 Bkash - Recharge Number: 01567906551\n'
-        + '💳 Nogod - Recharge Number: 01567906551\n'
-        + '💳 Rocket - Recharge Number: 01567906551';
+    let methods = [];
+    try {
+        methods = await PaymentMethod.find({ isActive: true }).sort({ order: 1 });
+    } catch (e) {}
 
-    await userService.setState(user, 'TOPUP');
-    return await sendText(psid,
-        `💰 TOP-UP BALANCE\n\n` +
-        `${paymentInfo}\n\n` +
-        `──────────────────────\n` +
-        `After sending your payment, reply with the\n` +
-        `💵 Amount paid (numbers only, e.g. 5 or 2.50):\n\n` +
-        `(0 = Back, 9 = Menu)`
-    );
+    if (!methods.length) {
+        // Fallback hardcoded methods
+        methods = [
+            { _id: 'binance', name: 'Binance',  icon: '💛', detail: 'Recharge ID: 909914646' },
+            { _id: 'bkash',   name: 'Bkash',    icon: '🩷', detail: 'Number: 01567906551' },
+            { _id: 'nogod',   name: 'Nagad',    icon: '🟠', detail: 'Number: 01567906551' },
+            { _id: 'rocket',  name: 'Rocket',   icon: '💜', detail: 'Number: 01567906551' },
+        ];
+    }
+
+    await userService.setState(user, 'TOPUP_METHOD', { paymentMethods: methods.map(m => ({
+        id: m._id.toString(), name: m.name, icon: m.icon, detail: m.detail, instructions: m.instructions || ''
+    }))});
+
+    let msg = `💰 TOP-UP BALANCE\n\n🎯 Choose a payment method:\n\n`;
+    methods.forEach((m, i) => {
+        msg += `${i + 1}️⃣  ${m.icon} ${m.name}\n`;
+    });
+    msg += `\n(0 = Back, 9 = Menu)`;
+    return await sendText(psid, msg);
 }
 
-// Step 1 — User sends amount
-async function handleTopUp(user, psid, input, rawMessage) {
+// Step 1 — User picks payment method
+async function handleTopUpMethod(user, psid, input) {
     if (input.type === 'number' && input.value === 0) {
         await userService.setState(user, 'MAIN_MENU');
         return await showMainMenu(psid);
     }
+    const methods = user.stateData?.paymentMethods || [];
+    const idx = (input.value || 0) - 1;
+    if (input.type !== 'number' || idx < 0 || idx >= methods.length) {
+        return await sendText(psid, `❌ Type a number from 1 to ${methods.length}:\n\n(0 = Back)`);
+    }
+
+    const method = methods[idx];
+    await userService.setState(user, 'TOPUP', { paymentMethods: methods, selectedMethod: method });
+
+    let msg =
+        `${method.icon} ${method.name.toUpperCase()}\n\n` +
+        `📋 ${method.detail}\n`;
+    if (method.instructions) msg += `\nℹ️  ${method.instructions}\n`;
+    msg +=
+        `\n──────────────────────\n` +
+        `Send your payment then reply with the\n` +
+        `💵 Amount paid (e.g. 5 or 2.50):\n\n` +
+        `(0 = Back)`;
+    return await sendText(psid, msg);
+}
+
+// Step 2 — User sends amount
+async function handleTopUp(user, psid, input, rawMessage) {
+    if (input.type === 'number' && input.value === 0) {
+        return await handleTopUpStart(user, psid);
+    }
 
     const raw = (rawMessage || '').trim();
-    // Parse number from input (accepts "5", "2.50", "$3", "3$", "3,50")
     const match = raw.match(/^\$?\s*(\d+(?:[.,]\d{1,2})?)\s*\$?$/);
     if (!match) {
         return await sendText(psid,
-            `❌ Please send the amount as a number only.\n` +
+            `❌ Send the amount as a number only.\n` +
             `Example: 5  or  2.50\n\n(0 = Back)`
         );
     }
 
     const amount = parseFloat(match[1].replace(',', '.'));
     if (isNaN(amount) || amount <= 0) {
-        return await sendText(psid, '❌ Invalid amount. Please try again.\n\n(0 = Back)');
+        return await sendText(psid, '❌ Invalid amount. Try again.\n\n(0 = Back)');
     }
 
-    // Save amount in stateData, move to ref step
-    await userService.setState(user, 'TOPUP_REF', { topupAmount: amount });
+    const method = user.stateData?.selectedMethod;
+    await userService.setState(user, 'TOPUP_REF', {
+        topupAmount: amount,
+        selectedMethod: method
+    });
     return await sendText(psid,
         `💵 Amount: $${amount.toFixed(2)} ✅\n\n` +
         `Now send your 📋 Transaction ID / Reference:\n` +
-        `(screenshot description, TxID, order ref…)\n\n` +
+        `(TxID, order ref, screenshot description…)\n\n` +
         `(0 = Back)`
     );
 }
 
-// Step 2 — User sends transaction reference
+// Step 3 — User sends transaction reference
 async function handleTopUpRef(user, psid, input, rawMessage) {
     if (input.type === 'number' && input.value === 0) {
-        // Back to amount step
         return await handleTopUpStart(user, psid);
     }
 
     const ref = (rawMessage || '').trim();
     if (ref.length < 2) {
-        return await sendText(psid, '❌ Reference too short. Please send your transaction ID.\n\n(0 = Back)');
+        return await sendText(psid, '❌ Reference too short. Send your transaction ID.\n\n(0 = Back)');
     }
 
     const amount = user.stateData?.topupAmount || 0.01;
+    const method = user.stateData?.selectedMethod;
 
     try {
         await TopUpRequest.create({
@@ -912,11 +952,12 @@ async function handleTopUpRef(user, psid, input, rawMessage) {
             psid,
             email:  user.email,
             amount,
-            notes:  `Ref: ${ref}`
+            notes:  `Method: ${method?.name || 'N/A'} | Ref: ${ref}`
         });
         await userService.setState(user, 'MAIN_MENU');
         return await sendText(psid,
             `✅ TOP-UP REQUEST SENT!\n\n` +
+            `${method?.icon || '💳'} Method:    ${method?.name || 'N/A'}\n` +
             `💵 Amount:    $${amount.toFixed(2)}\n` +
             `📋 Reference: ${ref}\n\n` +
             `👨‍💼 An admin will verify your payment and credit your balance shortly.\n\n` +
