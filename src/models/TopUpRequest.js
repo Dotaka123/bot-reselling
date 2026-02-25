@@ -9,6 +9,8 @@ const TopUpRequestSchema = new mongoose.Schema({
     approvedAmount: { type: Number, default: 0 },
     approvedBy: String,
     approvedAt: Date,
+    reference: { type: String, default: '' },
+    paymentMethod: { type: String, default: '' },
     notes: String,
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
