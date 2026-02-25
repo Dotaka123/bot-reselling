@@ -334,6 +334,10 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
         <span class="icon">💰</span><span>Top-up</span>
         <span class="nav-badge" id="badge-topups">0</span>
       </button>
+      <div class="nav-section">Settings</div>
+      <button class="nav-item" onclick="nav('payments')" id="nav-payments">
+        <span class="icon">💳</span><span>Payment Methods</span>
+      </button>
       <div class="nav-section">Broadcast</div>
       <a class="nav-item" onclick="openBroadcast()">📢 Send to All Users</a>
       <div class="nav-section">Support</div>
@@ -483,6 +487,26 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5}
             </table>
           </div>
           <div class="card-body" id="proxiesPagination" style="padding:.7rem 1rem"></div>
+        </div>
+      </div>
+
+      <div class="page" id="page-payments">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Payment Methods</div>
+            <div class="page-sub">Shown to users during top-up</div>
+          </div>
+          <button class="btn" onclick="openAddPayment()">+ Add Method</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Order</th><th>Icon</th><th>Name</th><th>Detail</th><th>Instructions</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="paymentsBody"><tr><td colspan="7" class="loader">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -727,6 +751,7 @@ function nav(page) {
     if (page === 'topups') loadTopups();
     if (page === 'support') loadSupport();
     if (page === 'proxies') loadProxies();
+    if (page === 'payments') loadPayments();
 }
 
 function refreshCurrentPage() { nav(currentPage); }
@@ -1086,7 +1111,7 @@ async function sendBroadcast() {
     res.textContent = '⏳ Sending…';
 
     try {
-        const data = await apiFetch('/admin/broadcast', 'POST', { message });
+        const data = await apiFetch('/api/admin/broadcast', 'POST', { message });
         res.style.color = 'var(--success, #22c55e)';
         res.textContent = `✅ Done! Sent: ${data.sent} | Failed: ${data.failed} | Total users: ${data.total}`;
     } catch (e) {
@@ -1153,6 +1178,130 @@ function toast(msg, type='ok') {
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => { el.className = ''; }, 3500);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT METHODS
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadPayments() {
+    try {
+        const methods = await apiFetch('/api/admin/payment-methods');
+        const tbody = document.getElementById('paymentsBody');
+        if (!methods.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#888">No payment methods yet. Click + Add Method.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = methods.map(m => `
+            <tr>
+                <td>${m.order}</td>
+                <td style="font-size:1.4rem">${m.icon || '💳'}</td>
+                <td><strong>${m.name}</strong></td>
+                <td>${m.detail}</td>
+                <td style="color:#888;font-size:.85rem">${m.instructions || '—'}</td>
+                <td><span style="color:${m.isActive ? '#10b981' : '#ef4444'}">${m.isActive ? '✅ Active' : '❌ Off'}</span></td>
+                <td>
+                    <button class="btn-sm" onclick="editPayment('${m._id}','${m.name.replace(/'/g,"\\'")}','${(m.icon||'💳')}','${m.detail.replace(/'/g,"\\'")}','${(m.instructions||'').replace(/'/g,"\\'")}',${m.isActive},${m.order})">Edit</button>
+                    <button class="btn-sm btn-danger" onclick="deletePayment('${m._id}','${m.name.replace(/'/g,"\\'")}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        document.getElementById('paymentsBody').innerHTML = `<tr><td colspan="7">Error: ${err.message}</td></tr>`;
+    }
+}
+
+function openAddPayment() {
+    document.getElementById('paymentModalTitle').textContent = '➕ Add Payment Method';
+    document.getElementById('paymentId').value = '';
+    document.getElementById('paymentName').value = '';
+    document.getElementById('paymentIcon').value = '💳';
+    document.getElementById('paymentDetail').value = '';
+    document.getElementById('paymentInstructions').value = '';
+    document.getElementById('paymentActive').checked = true;
+    document.getElementById('paymentOrder').value = '0';
+    document.getElementById('paymentModal').style.display = 'flex';
+}
+
+function editPayment(id, name, icon, detail, instructions, isActive, order) {
+    document.getElementById('paymentModalTitle').textContent = '✏️ Edit Payment Method';
+    document.getElementById('paymentId').value = id;
+    document.getElementById('paymentName').value = name;
+    document.getElementById('paymentIcon').value = icon;
+    document.getElementById('paymentDetail').value = detail;
+    document.getElementById('paymentInstructions').value = instructions;
+    document.getElementById('paymentActive').checked = isActive;
+    document.getElementById('paymentOrder').value = order;
+    document.getElementById('paymentModal').style.display = 'flex';
+}
+
+async function savePayment() {
+    const id   = document.getElementById('paymentId').value;
+    const body = {
+        name:         document.getElementById('paymentName').value.trim(),
+        icon:         document.getElementById('paymentIcon').value.trim() || '💳',
+        detail:       document.getElementById('paymentDetail').value.trim(),
+        instructions: document.getElementById('paymentInstructions').value.trim(),
+        isActive:     document.getElementById('paymentActive').checked,
+        order:        parseInt(document.getElementById('paymentOrder').value) || 0
+    };
+    if (!body.name || !body.detail) return alert('Name and Detail are required.');
+    try {
+        if (id) {
+            await apiFetch('/api/admin/payment-methods/' + id, 'PUT', body);
+        } else {
+            await apiFetch('/api/admin/payment-methods', 'POST', body);
+        }
+        document.getElementById('paymentModal').style.display = 'none';
+        loadPayments();
+    } catch (err) { alert('Error: ' + err.message); }
+}
+
+async function deletePayment(id, name) {
+    if (!confirm('Delete "' + name + '"?')) return;
+    try {
+        await apiFetch('/api/admin/payment-methods/' + id, 'DELETE');
+        loadPayments();
+    } catch (err) { alert('Error: ' + err.message); }
+}
 </script>
+
+<!-- MODAL: Payment Method -->
+<div class="modal-overlay" id="paymentModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="paymentModalTitle">Payment Method</span>
+      <button class="modal-close" onclick="document.getElementById('paymentModal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="paymentId">
+      <div class="form-group">
+        <label>Icon (emoji)</label>
+        <input class="form-input" id="paymentIcon" placeholder="💳" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label>Name *</label>
+        <input class="form-input" id="paymentName" placeholder="Binance">
+      </div>
+      <div class="form-group">
+        <label>Detail * (shown to user)</label>
+        <input class="form-input" id="paymentDetail" placeholder="Recharge ID: 909914646">
+      </div>
+      <div class="form-group">
+        <label>Extra Instructions (optional)</label>
+        <input class="form-input" id="paymentInstructions" placeholder="Send BNB or USDT only">
+      </div>
+      <div class="form-group" style="display:flex;gap:1rem;align-items:center">
+        <label>Display Order</label>
+        <input class="form-input" id="paymentOrder" type="number" value="0" style="width:80px">
+        <label style="display:flex;align-items:center;gap:.4rem;margin:0">
+          <input type="checkbox" id="paymentActive" checked> Active
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="savePayment()">💾 Save</button>
+      <button class="btn btn-outline" onclick="document.getElementById('paymentModal').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
