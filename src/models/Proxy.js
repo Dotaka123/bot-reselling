@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const ProxySchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    apiProxyId: { type: Number, default: null },   // ID from upstream proxy API (for modify/renew)
     ip: { type: String, required: true },
     port: { type: Number, required: true },
     username: { type: String, required: true },
@@ -15,7 +16,7 @@ const ProxySchema = new mongoose.Schema({
     expiresAt: { type: Date, required: true },
     status: { type: String, enum: ['ACTIVE', 'EXPIRED', 'SUSPENDED'], default: 'ACTIVE' },
     price: { type: Number, required: true },
-    package: { type: String, enum: ['GOLDEN', 'SILVER'], default: 'SILVER' },
+    package: { type: String, default: 'SILVER' },  // e.g. 'GOLDEN', 'SILVER', or pkgName
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
