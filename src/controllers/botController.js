@@ -559,7 +559,9 @@ async function handleBuyProvider(user, psid, input) {
         onSelect: async (provider, page) => {
             try {
                 const allParents = await proxyApi.getParents(user.stateData.pkgId, 0, null, provider.id);
-                const parents = allParents.filter(p => p.is_available && p.status === 'ACTIVE');
+                // API doc: is_available=true means a new proxy CAN be purchased here.
+                // status=OUT_OF_SVC is just a notice; is_available is the only purchase gate.
+                const parents = allParents.filter(p => p.is_available === true);
                 if (!parents || parents.length === 0) return await sendText(psid, `❌ No available nodes for ${provider.service_provider_name}. Choose another.`);
                 const tp = totalPages(parents);
                 await userService.setState(user, 'BUY_PARENT', {
@@ -1128,7 +1130,7 @@ async function handleChangeCity(user, psid, input) {
     try {
         await sendText(psid, `⏳ Finding proxy in ${city.city_name}...`);
         const parents = await proxyApi.getParents('1', 0, city.id);
-        const available = parents.filter(p => p.is_available || p.status === 'active');
+        const available = parents.filter(p => p.is_available === true);
 
         if (!available.length) {
             return await sendText(psid, `❌ No proxy available in ${city.city_name}. Try another city.\n\n(0 = Back)`);
