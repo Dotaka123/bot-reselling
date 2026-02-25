@@ -801,7 +801,7 @@ async function handleBuyConfirm(user, psid, input) {
 
         // Save proxy to local DB
         await proxyService.saveProxy(user._id, user.psid, {
-            apiProxyId: proxy.id,
+            apiProxyId: proxy.id,  // stored for modifyProxy/renewProxy calls
             ip:         proxy.ip_addr,
             http_port:  proxy.port,
             socks_port: proxy.port,
@@ -810,7 +810,7 @@ async function handleBuyConfirm(user, psid, input) {
             country:    proxy.country_name || sd.countryName,
             city:       proxy.city_name    || sd.cityName,
             protocol:   proxy.type         || sd.protocol,
-            package:    sd.pkgName,
+            package:    sd.pkgId === String(GOLDEN_PKG_ID) ? 'GOLDEN' : 'SILVER',
             expiresAt:  proxy.expire_at ? new Date(proxy.expire_at) : null
         });
 
@@ -964,7 +964,7 @@ async function showMyProxies(user, psid) {
     all.forEach((p, i) => {
         const daysLeft = p.expiresAt ? Math.ceil((new Date(p.expiresAt) - Date.now()) / 86400000) : null;
         const status   = daysLeft !== null && daysLeft <= 0 ? '❌' : '✅';
-        const pkg      = (p.package || '').includes('GOLDEN') || (p.package || '').includes('1') ? '🥇' : '🥈';
+        const pkg      = (p.package || '').toUpperCase() === 'GOLDEN' ? '🥇' : '🥈';
         msg += `${i + 1}️⃣  ${status} ${pkg} ${p.ip}:${p.port || p.httpPort || '—'}\n`;
         msg += `     📍 ${p.country || '—'} | ${daysLeft !== null && daysLeft > 0 ? daysLeft + 'd left' : 'Expired'}\n\n`;
     });
@@ -991,7 +991,7 @@ async function handleManageProxy(user, psid, input) {
 
     const daysLeft  = proxy.expiresAt ? Math.ceil((new Date(proxy.expiresAt) - Date.now()) / 86400000) : null;
     const isActive  = daysLeft !== null && daysLeft > 0;
-    const isGolden  = (proxy.package || '').toUpperCase().includes('GOLDEN') || (proxy.package || '') === '1';
+    const isGolden  = (proxy.package || '').toUpperCase() === 'GOLDEN';
 
     await userService.setState(user, 'MANAGE_PROXY', {
         proxies,
@@ -1010,9 +1010,31 @@ async function handleManageProxy(user, psid, input) {
         `⏱️  Status:   ${isActive ? '✅ Active — ' + daysLeft + ' day(s) left' : '❌ Expired'}\n\n`;
 
     // Handle action selection on second call (selectedProxyId already set)
-    if (user.stateData.selectedProxyId && input.type === 'number' && input.value === 1 && isGolden && isActive) {
-        await userService.setState(user, 'CHANGE_COUNTRY', { ...user.stateData });
-        return await handleChangeCountry(user, psid, { type: 'text', value: null });
+    if (user.stateData.selectedProxyId && input.type === 'number' && input.value === 1 && isActive) {
+        if (isGolden) {
+            await userService.setState(user, 'CHANGE_COUNTRY', { ...user.stateData });
+            return await handleChangeCountry(user, psid, { type: 'text', value: null });
+        } else {
+            // Silver: skip country selection, go straight to city selection
+            await sendText(psid, '⏳ Loading cities...');
+            try {
+                const countries = await proxyApi.getCountries(String(SILVER_PKG_ID));
+                // Use proxy's current country if possible, else show country list
+                const cities = await proxyApi.getCities(countries[0]?.id, String(SILVER_PKG_ID));
+                await userService.setState(user, 'CHANGE_CITY', {
+                    ...user.stateData,
+                    selectedCountryId: countries[0]?.id,
+                    selectedCountryName: proxy.country || countries[0]?.country_name || 'N/A',
+                    cities
+                });
+                let msg = `🏙️ CHANGE CITY\n\nAvailable cities:\n\n`;
+                cities.slice(0, 10).forEach((c, i) => { msg += `${i + 1}️⃣  ${c.city_name}\n`; });
+                msg += `\n(0 = Back)`;
+                return await sendText(psid, msg);
+            } catch (err) {
+                return await sendText(psid, '❌ Error loading cities. Try again.\n\n(0 = Back)');
+            }
+        }
     }
 
     if (isGolden && isActive) {
@@ -1020,11 +1042,12 @@ async function handleManageProxy(user, psid, input) {
             `What would you like to do?\n\n` +
             `1️⃣  🌍 Change country\n` +
             `0️⃣  ← Back to proxy list`;
-    } else if (!isGolden) {
+    } else if (!isGolden && isActive) {
+        // Silver: can change city (same country, different city/node via modifyProxy)
         msg +=
-            `ℹ️  Silver proxies have a fixed country.\n` +
-            `To get a different location, purchase a new proxy.\n\n` +
-            `0️⃣  ← Back`;
+            `What would you like to do?\n\n` +
+            `1️⃣  🏙️ Change city\n` +
+            `0️⃣  ← Back to proxy list`;
     } else {
         msg += `0️⃣  ← Back`;
     }
@@ -1040,7 +1063,7 @@ async function handleChangeCountry(user, psid, input) {
         const Proxy = require('../models/Proxy');
         const proxy = await Proxy.findById(user.stateData.selectedProxyId);
         if (!proxy) return await showMyProxies(user, psid);
-        const isGolden = (proxy.package || '').toUpperCase().includes('GOLDEN');
+        const isGolden = (proxy.package || '').toUpperCase() === 'GOLDEN';
         const daysLeft = proxy.expiresAt ? Math.ceil((new Date(proxy.expiresAt) - Date.now()) / 86400000) : null;
         const isActive = daysLeft !== null && daysLeft > 0;
         let msg =
