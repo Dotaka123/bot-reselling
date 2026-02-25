@@ -10,6 +10,7 @@ const Proxy    = require('../models/Proxy');
 const SupportMessage = require('../models/SupportMessage');
 const TopUpRequest   = require('../models/TopUpRequest');
 const { sendText }   = require('../utils/messenger');
+const PaymentMethod  = require('../models/PaymentMethod');
 
 // ── Simple token store (in-memory, resets on restart) ──────────────────────
 const SESSIONS = new Set();
@@ -305,6 +306,34 @@ router.patch('/topups/:id/reject', requireAuth, async (req, res) => {
     }
 });
 
+// ── BROADCAST ─────────────────────────────────────────────────────────────
+
+router.post('/broadcast', requireAuth, async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message?.trim()) return res.status(400).json({ error: 'Empty message' });
+
+        const users = await User.find({ psid: { $exists: true, $ne: null } }).select('psid');
+        if (!users.length) return res.json({ sent: 0, failed: 0 });
+
+        let sent = 0, failed = 0;
+        for (const user of users) {
+            try {
+                const ok = await sendText(user.psid, `📣 Announcement:\n\n${message.trim()}`);
+                ok ? sent++ : failed++;
+            } catch {
+                failed++;
+            }
+            // Small delay to avoid hitting Messenger rate limits
+            await new Promise(r => setTimeout(r, 50));
+        }
+
+        res.json({ sent, failed, total: users.length });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ── PROXIES ────────────────────────────────────────────────────────────────
 
 router.get('/proxies', requireAuth, async (req, res) => {
@@ -321,6 +350,63 @@ router.get('/proxies', requireAuth, async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// ── PAYMENT METHODS ──────────────────────────────────────────────────────────
+
+// Seed default methods if none exist
+async function seedPaymentMethods() {
+    const count = await PaymentMethod.countDocuments();
+    if (count === 0) {
+        await PaymentMethod.insertMany([
+            { name: 'Binance', icon: '💛', detail: 'Recharge ID: 909914646',   order: 1 },
+            { name: 'Bkash',   icon: '🩷', detail: 'Number: 01567906551',       order: 2 },
+            { name: 'Nagad',   icon: '🟠', detail: 'Number: 01567906551',       order: 3 },
+            { name: 'Rocket',  icon: '💜', detail: 'Number: 01567906551',       order: 4 },
+        ]);
+        console.log('✅ Default payment methods seeded');
+    }
+}
+seedPaymentMethods().catch(console.error);
+
+// GET all
+router.get('/payment-methods', requireAuth, async (req, res) => {
+    try {
+        const methods = await PaymentMethod.find().sort({ order: 1 });
+        res.json(methods);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST create
+router.post('/payment-methods', requireAuth, async (req, res) => {
+    try {
+        const { name, icon, detail, instructions, isActive, order } = req.body;
+        if (!name || !detail) return res.status(400).json({ error: 'name and detail required' });
+        const method = await PaymentMethod.create({ name, icon: icon || '💳', detail, instructions, isActive: isActive !== false, order: order || 0 });
+        res.json(method);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT update
+router.put('/payment-methods/:id', requireAuth, async (req, res) => {
+    try {
+        const { name, icon, detail, instructions, isActive, order } = req.body;
+        const method = await PaymentMethod.findByIdAndUpdate(
+            req.params.id,
+            { name, icon, detail, instructions, isActive, order },
+            { new: true }
+        );
+        if (!method) return res.status(404).json({ error: 'Not found' });
+        res.json(method);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE
+router.delete('/payment-methods/:id', requireAuth, async (req, res) => {
+    try {
+        await PaymentMethod.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;
