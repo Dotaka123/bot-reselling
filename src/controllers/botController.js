@@ -151,6 +151,8 @@ async function handleMessage(psid, messageText) {
                 case 'BUY_PROVIDER':      return await handleBuyProvider(user, psid, input);
                 case 'BUY_PARENT':        return await handleBuyParent(user, psid, input);
                 case 'BUY_CREDENTIALS':   return await handleBuyCredentials(user, psid, input, messageText);
+                case 'BUY_USERNAME':      return await handleBuyUsername(user, psid, input, messageText);
+                case 'BUY_PASSWORD':      return await handleBuyPassword(user, psid, input, messageText);
                 case 'BUY_CONFIRM':       return await handleBuyConfirm(user, psid, input);
                 case 'TOPUP_METHOD':      return await handleTopUpMethod(user, psid, input);
                 case 'TOPUP':             return await handleTopUp(user, psid, input, messageText);
@@ -614,7 +616,7 @@ async function handleBuyParent(user, psid, input) {
                 ? (parent.socks_port || parent.http_port || '?')
                 : (parent.http_port  || '?');
 
-            await userService.setState(user, 'BUY_CREDENTIALS', {
+            await userService.setState(user, 'BUY_USERNAME', {
                 ...sd,
                 parentId: parent.id,
                 parentTech: parent.technology || 'N/A',
@@ -622,12 +624,11 @@ async function handleBuyParent(user, psid, input) {
                 parentPort: port, parentPage: page
             });
             await sendText(psid,
-                `🔐 BUY A PROXY — Step 7\n\n` +
+                `🔐 BUY A PROXY — Step 7a\n\n` +
                 `Set YOUR PROXY credentials:\n\n` +
-                `📝 Format: username password\n` +
-                `   Example: myuser mypass123\n\n` +
+                `👤 Enter your USERNAME:\n` +
                 `⚠️ Rules: lowercase letters, digits, _ and - only\n` +
-                `   Min 3 characters each\n\n` +
+                `   Min 3 characters\n\n` +
                 `(0 = Back)`
             );
         },
@@ -701,8 +702,90 @@ async function handleBuyProto(user, psid, input) {
     return await sendText(psid, msg);
 }
 
-// ── BUY CREDENTIALS ───────────────────────────────────────────────────────────
+// ── BUY USERNAME (step 7a) ────────────────────────────────────────────────────
 
+async function handleBuyUsername(user, psid, input, rawMessage) {
+    if (input.type === 'number' && input.value === 0) {
+        // Back = return to node selection
+        const parents = user.stateData.parents || [];
+        const parentPage = user.stateData.parentPage || 1;
+        await userService.setState(user, 'BUY_PARENT', { ...user.stateData });
+        const pageP = getPage(parents, parentPage);
+        const tp = totalPages(parents);
+        let msg = `🖥️ Nodes (Page ${parentPage}/${tp}):\n\n`;
+        pageP.forEach((p, i) => msg += `${i + 1}️⃣  ${formatParentLabel(p)}\n`);
+        if (parentPage < tp) msg += `\n9️⃣  ➡️  Next page`;
+        msg += `\n0️⃣  Back`;
+        return await sendText(psid, msg);
+    }
+
+    const username = (rawMessage || '').trim();
+    if (!CRED_PATTERN.test(username)) {
+        return await sendText(psid, `❌ Invalid characters!\n⚠️ Only: lowercase letters, digits, _ and -\n\nTry again (or 0 to go back):`);
+    }
+    if (username.length < 3) {
+        return await sendText(psid, `❌ Must be at least 3 characters.\n\nTry again (or 0 to go back):`);
+    }
+
+    await userService.setState(user, 'BUY_PASSWORD', { ...user.stateData, proxyUsername: username });
+    await sendText(psid,
+        `🔐 BUY A PROXY — Step 7b\n\n` +
+        `👤 Username: ${username}\n\n` +
+        `🔑 Now enter your PASSWORD:\n` +
+        `⚠️ Rules: lowercase letters, digits, _ and - only\n` +
+        `   Min 3 characters\n\n` +
+        `(0 = Back)`
+    );
+}
+
+// ── BUY PASSWORD (step 7b) ────────────────────────────────────────────────────
+
+async function handleBuyPassword(user, psid, input, rawMessage) {
+    if (input.type === 'number' && input.value === 0) {
+        // Back = re-ask username
+        await userService.setState(user, 'BUY_USERNAME', { ...user.stateData, proxyUsername: undefined });
+        return await sendText(psid,
+            `🔐 BUY A PROXY — Step 7a\n\n` +
+            `👤 Enter your USERNAME:\n` +
+            `⚠️ Rules: lowercase letters, digits, _ and - only\n` +
+            `   Min 3 characters\n\n` +
+            `(0 = Back)`
+        );
+    }
+
+    const password = (rawMessage || '').trim();
+    const username = user.stateData?.proxyUsername || '';
+    if (!CRED_PATTERN.test(password)) {
+        return await sendText(psid, `❌ Invalid characters!\n⚠️ Only: lowercase letters, digits, _ and -\n\nTry again (or 0 to go back):`);
+    }
+    if (password.length < 3) {
+        return await sendText(psid, `❌ Must be at least 3 characters.\n\nTry again (or 0 to go back):`);
+    }
+
+    const sd = user.stateData;
+    await userService.setState(user, 'BUY_CONFIRM', { ...sd, proxyPassword: password });
+
+    const hasBalance = (user.balance || 0) >= sd.price;
+    await sendText(psid,
+        `✅ ORDER SUMMARY\n\n` +
+        `📦 Package:   ${sd.pkgName}\n` +
+        `⏱️  Duration:  ${sd.durationLabel}\n` +
+        `🌍 Country:   ${sd.countryName}\n` +
+        `🏙️  City:      ${sd.cityName}\n` +
+        `📡 Provider:  ${sd.providerName}\n` +
+        `🖥️  Node:      ${sd.parentTech}\n` +
+        `📡 Protocol:  ${sd.protocol.toUpperCase()}\n` +
+        `👤 Username:  ${username}\n` +
+        `🔑 Password:  ${password}\n` +
+        `💰 Price:     $${sd.price.toFixed(2)}\n` +
+        `💳 Balance:   $${(user.balance || 0).toFixed(2)}\n\n` +
+        (hasBalance
+            ? `1️⃣  ✅ CONFIRM & BUY\n0️⃣  ❌ Cancel`
+            : `❌ Insufficient balance!\nRequired: $${sd.price.toFixed(2)}\nYours: $${(user.balance || 0).toFixed(2)}\n\n4️⃣  💰 Top-up balance\n5️⃣  💬 Contact support\n0️⃣  Cancel`)
+    );
+}
+
+// ── BUY CREDENTIALS (legacy — kept for backward compat) ───────────────────────
 async function handleBuyCredentials(user, psid, input, rawMessage) {
     if (input.type === 'number' && input.value === 0) {
         // Back = return to node selection
@@ -952,6 +1035,8 @@ async function handleTopUpRef(user, psid, input, rawMessage) {
             psid,
             email:  user.email,
             amount,
+            reference: ref,
+            paymentMethod: method?.name || 'N/A',
             notes:  `Method: ${method?.name || 'N/A'} | Ref: ${ref}`
         });
         await userService.setState(user, 'MAIN_MENU');
